@@ -1,0 +1,1267 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#06111b" />
+  <title>Earth Evidence — V1 Prototype</title>
+  <meta name="description" content="Earth Evidence: see what is happening, see the evidence, see what you can do." />
+  <link rel="preconnect" href="https://unpkg.com" />
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" />
+  <style>
+:root {
+  color-scheme: dark;
+  --bg: #06111b;
+  --panel: rgba(8, 25, 38, 0.90);
+  --panel-2: rgba(10, 34, 50, 0.92);
+  --text: #f4fbff;
+  --muted: #9fb8c8;
+  --line: rgba(255,255,255,.12);
+  --accent: #6ee7b7;
+  --accent-2: #38bdf8;
+  --warn: #fbbf24;
+  --shadow: 0 18px 50px rgba(0,0,0,.35);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); }
+body { overflow-x: hidden; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+.topbar {
+  height: 72px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px; border-bottom: 1px solid var(--line); background: rgba(6,17,27,.96);
+  position: sticky; top: 0; z-index: 20; backdrop-filter: blur(14px);
+}
+.brand { display:flex; align-items:center; gap:10px; color:var(--text); background:none; border:0; padding:0; text-align:left; }
+.brand-mark { width:36px; height:36px; border:1px solid rgba(110,231,183,.6); border-radius:50%; display:grid; place-items:center; color:var(--accent); font-size:24px; box-shadow: inset 0 0 20px rgba(110,231,183,.08); }
+.brand strong { display:block; letter-spacing:.08em; font-size:14px; }
+.brand small { display:block; color:var(--muted); margin-top:2px; font-size:11px; }
+.top-actions { display:flex; align-items:center; gap:10px; }
+.ghost, .primary, .tab, .layer, .card-actions button, .close { border:1px solid var(--line); color:var(--text); background:rgba(255,255,255,.04); border-radius:12px; }
+.ghost { padding:9px 12px; }
+.prototype-badge { font-size:10px; letter-spacing:.08em; color:#bfe6ff; border:1px solid rgba(56,189,248,.3); background:rgba(56,189,248,.10); border-radius:999px; padding:7px 9px; }
+main { min-height: calc(100vh - 72px); }
+.hero-panel { padding: 26px 22px 18px; max-width: 900px; margin: 0 auto; text-align:center; }
+.hero-panel h1 { margin:0 0 8px; font-size: clamp(28px, 5vw, 48px); line-height:1.04; letter-spacing:-.035em; }
+.hero-panel p { margin:0 auto 18px; color:var(--muted); max-width:680px; }
+.search-row { display:flex; gap:8px; max-width:680px; margin:0 auto 14px; }
+.search-row input { flex:1; min-width:0; border-radius:14px; border:1px solid var(--line); background:rgba(255,255,255,.055); color:var(--text); padding:13px 14px; outline:none; }
+.search-row input:focus { border-color:rgba(110,231,183,.65); box-shadow:0 0 0 3px rgba(110,231,183,.10); }
+.primary { padding:13px 18px; background:var(--accent); color:#032219; font-weight:800; border-color:transparent; }
+.mode-tabs { display:flex; justify-content:center; gap:6px; flex-wrap:wrap; }
+.tab { padding:9px 13px; }
+.tab.active { background:rgba(110,231,183,.14); border-color:rgba(110,231,183,.45); color:#c8ffeb; }
+.map-shell { position:relative; min-height: 680px; border-top:1px solid var(--line); overflow:hidden; }
+#map { position:absolute; inset:0; min-height:680px; background: radial-gradient(circle at 50% 45%, #12364d 0, #06111b 65%); }
+.layer-picker { position:absolute; top:16px; left:16px; z-index:4; display:flex; gap:7px; flex-wrap:wrap; max-width:70%; }
+.layer { padding:9px 11px; backdrop-filter: blur(10px); background:rgba(6,17,27,.78); }
+.layer span { margin-right:5px; }
+.layer.active { border-color:rgba(110,231,183,.5); background:rgba(17,70,62,.82); }
+.status-strip { position:absolute; left:16px; bottom:16px; z-index:4; max-width:min(720px, calc(100% - 32px)); padding:10px 13px; border:1px solid var(--line); border-radius:12px; background:rgba(6,17,27,.84); color:var(--muted); font-size:12px; backdrop-filter:blur(12px); }
+.status-strip strong { color:var(--text); }
+.status-dot { width:8px; height:8px; display:inline-block; border-radius:50%; background:var(--warn); margin-right:7px; box-shadow:0 0 10px rgba(251,191,36,.5); }
+.event-card { position:absolute; z-index:5; top:16px; right:16px; width:min(410px, calc(100% - 32px)); background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:18px; box-shadow:var(--shadow); backdrop-filter:blur(16px); }
+.card-eyebrow, .drawer-eyebrow { color:var(--accent); font-size:11px; letter-spacing:.12em; font-weight:800; }
+.event-card h2 { margin:7px 0 6px; font-size:24px; letter-spacing:-.02em; }
+.card-sub { margin:0 0 16px; color:var(--muted); font-size:13px; line-height:1.45; }
+.metric-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.metric-grid > div { min-height:76px; border:1px solid var(--line); border-radius:12px; padding:10px; background:rgba(255,255,255,.035); }
+.metric-grid span { display:block; color:var(--muted); font-size:10px; letter-spacing:.08em; margin-bottom:7px; }
+.metric-grid strong { display:block; font-size:14px; line-height:1.25; }
+.trend-block { margin-top:12px; }
+.trend-head { display:flex; justify-content:space-between; gap:10px; color:var(--muted); font-size:11px; margin-bottom:7px; }
+.trend-placeholder { min-height:88px; border:1px dashed rgba(255,255,255,.18); border-radius:12px; display:grid; place-items:center; text-align:center; padding:14px; color:var(--muted); font-size:12px; background:linear-gradient(180deg, rgba(56,189,248,.05), rgba(110,231,183,.025)); }
+.card-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; }
+.card-actions button { padding:10px 8px; }
+.card-actions .accent { grid-column:1 / -1; background:var(--accent); color:#032219; border-color:transparent; font-weight:800; }
+.drawer { position:fixed; top:0; right:0; height:100vh; width:min(520px, 92vw); z-index:50; background:#081b29; border-left:1px solid var(--line); transform:translateX(102%); transition:transform .22s ease; box-shadow:var(--shadow); overflow-y:auto; }
+.drawer.open { transform:translateX(0); }
+.drawer-head { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; padding:20px; border-bottom:1px solid var(--line); position:sticky; top:0; background:rgba(8,27,41,.96); backdrop-filter:blur(14px); z-index:2; }
+.drawer-head h2 { margin:5px 0 0; }
+.close { width:38px; height:38px; font-size:24px; }
+.drawer-body { padding:20px; color:#d8e8f2; line-height:1.55; }
+.drawer-body h3 { margin:22px 0 8px; color:var(--text); }
+.drawer-body p { color:#bfd0da; }
+.drawer-body ul { padding-left:20px; }
+.drawer-body li { margin:8px 0; }
+.info-box { border:1px solid var(--line); border-radius:14px; padding:14px; margin:12px 0; background:rgba(255,255,255,.035); }
+.info-box strong { color:var(--text); }
+.scrim { position:fixed; inset:0; z-index:45; background:rgba(0,0,0,.42); opacity:0; pointer-events:none; transition:opacity .2s ease; }
+.scrim.show { opacity:1; pointer-events:auto; }
+
+.fire-marker { width:18px; height:18px; border-radius:50%; background:#ff6b35; border:2px solid #fff4ec; box-shadow:0 0 0 7px rgba(255,107,53,.20), 0 0 18px rgba(255,107,53,.75); cursor:pointer; }
+.fire-marker:hover { transform:scale(1.15); }
+.fire-marker.recent { width:14px; height:14px; opacity:.82; box-shadow:0 0 0 5px rgba(255,107,53,.14), 0 0 12px rgba(255,107,53,.55); }
+.fire-marker[hidden] { display:none !important; }
+
+
+.map-legend { position:absolute; z-index:6; left:16px; bottom:62px; width:min(405px,calc(100% - 32px)); border:1px solid var(--line); border-radius:14px; background:rgba(6,17,27,.91); backdrop-filter:blur(12px); padding:11px 12px; box-shadow:0 10px 26px rgba(0,0,0,.24); display:none; }
+.map-legend.show { display:block; }
+.legend-title { font-size:11px; font-weight:800; color:var(--text); margin-bottom:5px; }
+.legend-sub { font-size:10px; line-height:1.35; color:var(--muted); margin-bottom:7px; }
+.heat-scale { height:10px; border-radius:999px; background:linear-gradient(90deg,#193a8a 0%,#4f8bc9 22%,#cfe6f4 42%,#f5f5f1 50%,#f9c56e 65%,#ea6b3a 82%,#9d1f2f 100%); border:1px solid rgba(255,255,255,.13); }
+.legend-ticks { display:flex; justify-content:space-between; gap:8px; font-size:9px; color:var(--muted); margin-top:4px; }
+.fire-key { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--muted); }
+.fire-swatch { width:18px; height:18px; border-radius:4px; background:radial-gradient(circle,#fff7d6 0 18%,#ffb000 20% 42%,#e43d1a 44% 68%,rgba(228,61,26,.08) 70%); box-shadow:0 0 12px rgba(255,95,31,.55); flex:0 0 auto; }
+.legend-warning { margin-top:7px; font-size:9px; line-height:1.35; color:#d6c7a7; }
+.legend-link { display:inline-block; margin-top:7px; color:#8adfff; font-size:10px; text-decoration:none; }
+@media (max-width:820px){ .map-legend{left:10px;right:10px;width:auto;top:58px;bottom:auto;padding:9px 10px;} .legend-sub{font-size:9px;} }
+
+
+.fire-point-key { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--muted); }
+.fire-dot-key { width:18px; height:18px; border-radius:50%; background:#ff7a2f; border:2px solid #ffe0c7; box-shadow:0 0 10px rgba(255,92,31,.55); flex:0 0 auto; }
+.fire-feed-note { margin-top:6px; font-size:9px; color:#d6c7a7; line-height:1.35; }
+.maplibregl-ctrl-attrib { font-size:10px; }
+@media (max-width: 820px) {
+  .topbar { height:64px; padding:0 12px; }
+  .brand-mark { width:32px; height:32px; font-size:20px; }
+  .brand strong { font-size:13px; }
+  .brand small { font-size:10px; }
+  .top-actions .ghost { display:none; }
+  .prototype-badge { font-size:9px; padding:6px 8px; }
+
+  /* Keep the intro compact so Earth is visible immediately. */
+  .hero-panel { padding:12px 12px 10px; }
+  .hero-panel h1 { font-size:26px; margin-bottom:4px; }
+  .hero-panel p { font-size:13px; line-height:1.35; margin-bottom:10px; }
+  .search-row { flex-direction:row; gap:6px; margin-bottom:9px; }
+  .search-row input { padding:10px 11px; font-size:14px; }
+  .primary { padding:10px 13px; }
+  .mode-tabs { flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; padding-bottom:1px; scrollbar-width:none; }
+  .mode-tabs::-webkit-scrollbar, .layer-picker::-webkit-scrollbar { display:none; }
+  .tab { flex:0 0 auto; padding:8px 11px; font-size:13px; }
+
+  /* The globe is the hero on mobile. */
+  .map-shell, #map { height: calc(100svh - 205px); min-height:560px; }
+  .layer-picker { left:8px; right:8px; max-width:none; top:8px; gap:5px; flex-wrap:nowrap; overflow-x:auto; padding-bottom:3px; }
+  .layer { flex:0 0 auto; padding:8px 9px; font-size:12px; }
+  .status-strip { display:none; }
+
+  /* Start as a small bottom prompt so the globe is not hidden. */
+  .event-card { top:auto; bottom:10px; left:10px; right:10px; width:auto; max-height:70vh; overflow-y:auto; padding:16px; }
+  .event-card.compact { overflow:hidden; max-height:none; padding:12px 15px; background:rgba(8,25,38,.82); }
+  .event-card.compact .card-sub,
+  .event-card.compact .metric-grid,
+  .event-card.compact .trend-block,
+  .event-card.compact .card-actions { display:none; }
+  .event-card.compact .card-eyebrow { font-size:10px; }
+  .event-card.compact h2 { margin:4px 0 0; font-size:18px; }
+}
+
+#map.fallback-earth { display:grid; place-items:center; overflow:hidden; background: radial-gradient(circle at 50% 45%, #37a7db 0 17%, #1672a4 18% 26%, #0e4d73 27% 36%, #08263b 37% 55%, #06111b 70%); }
+#map.fallback-earth::before { content:""; width:min(56vw,460px); aspect-ratio:1; border-radius:50%; position:absolute; background: radial-gradient(circle at 35% 28%, rgba(255,255,255,.32), transparent 17%), radial-gradient(ellipse at 40% 38%, #4fbd73 0 12%, transparent 13%), radial-gradient(ellipse at 64% 60%, #5ac17b 0 10%, transparent 11%), linear-gradient(145deg,#2c98c5,#0a6b9f 55%,#07476e); box-shadow:0 0 80px rgba(56,189,248,.25), inset -35px -25px 60px rgba(0,0,0,.35); }
+.fallback-copy { position:relative; z-index:2; margin-top:420px; max-width:520px; text-align:center; background:rgba(6,17,27,.8); border:1px solid var(--line); padding:12px 16px; border-radius:14px; }
+.fallback-copy strong,.fallback-copy span{display:block}.fallback-copy span{margin-top:5px;color:var(--muted);font-size:12px}
+@media (max-width: 720px){.fallback-copy{margin-top:330px;margin-left:12px;margin-right:12px}#map.fallback-earth::before{width:72vw}}
+
+.loading-line { display:flex; align-items:center; gap:8px; color:var(--muted); }
+.spinner { width:16px; height:16px; border:2px solid rgba(255,255,255,.18); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; flex:0 0 auto; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.live-pill { display:inline-flex; align-items:center; gap:6px; padding:5px 8px; border:1px solid rgba(110,231,183,.35); background:rgba(110,231,183,.09); color:#c8ffeb; border-radius:999px; font-size:10px; letter-spacing:.06em; margin-top:7px; }
+.live-pill::before { content:""; width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 8px rgba(110,231,183,.75); }
+.trend-svg { width:100%; height:110px; display:block; }
+.trend-meta { display:flex; justify-content:space-between; gap:8px; margin-top:6px; font-size:10px; color:var(--muted); }
+.source-link { color:#8adfff; text-decoration:none; } .source-link:hover { text-decoration:underline; }
+
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <button class="brand" id="homeBtn" aria-label="Earth Evidence home">
+        <span class="brand-mark">◎</span>
+        <span><strong>EARTH EVIDENCE</strong><small>See it. Verify it. Act.</small></span>
+      </button>
+      <div class="top-actions">
+        <button class="ghost" id="trustBtn">Trust & sources</button>
+        <span class="prototype-badge">V1.6.2 · DENSER FIRE POINTS</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero-panel" aria-label="Explore Earth Evidence">
+        <h1>What is happening to our planet?</h1>
+        <p>Explore the evidence, compare change through time, and find useful ways to help.</p>
+        <div class="search-row">
+          <input id="placeSearch" type="search" placeholder="Search a place — e.g. Wales, Spain, Antarctica" autocomplete="off" aria-label="Search a place" />
+          <button id="searchBtn" class="primary">Search</button>
+        </div>
+        <div class="mode-tabs" role="tablist" aria-label="Main modes">
+          <button class="tab active" data-mode="now">Now</button>
+          <button class="tab" data-mode="change">Change over time</button>
+          <button class="tab" data-mode="action">Take action</button>
+        </div>
+      </section>
+
+      <section class="map-shell">
+        <div id="map" aria-label="Interactive globe"></div>
+
+        <div class="layer-picker" aria-label="Science layers">
+          <button class="layer active" data-layer="heat"><span>☀</span> Heat</button>
+          <button class="layer" data-layer="fire"><span>◉</span> Fire</button>
+          <button class="layer" data-layer="ocean"><span>≈</span> Ocean</button>
+          <button class="layer" data-layer="ice"><span>❄</span> Ice</button>
+          <button class="layer" data-layer="water"><span>☂</span> Rain / drought</button>
+          <button class="layer" data-layer="biodiversity"><span>♧</span> Biodiversity</button>
+          <button class="layer" data-layer="rivers"><span>≋</span> River health</button>
+        </div>
+        <div class="map-legend" id="mapLegend" aria-live="polite"></div>
+
+        <div class="status-strip" id="statusStrip">
+          <span class="status-dot"></span>
+          <strong>Science-feed status:</strong>
+          <span id="scienceStatusText">Heat: NASA + ERA5 point evidence with NOAA global anomaly shading. Fire: clustered NASA GIBS VIIRS point detections from NOAA-20 + NOAA-21. Other layers remain unconnected.</span>
+        </div>
+
+        <aside class="event-card compact" id="eventCard" aria-live="polite">
+          <div class="card-eyebrow" id="cardEyebrow">SELECT A LOCATION</div>
+          <h2 id="cardTitle">Tap anywhere on the globe</h2>
+          <p class="card-sub" id="cardSub">Earth Evidence will only show a measurement once its approved scientific feed, provenance and record period are available.</p>
+
+          <div class="metric-grid">
+            <div><span id="metricLabelNow">LATEST DAILY MEAN</span><strong id="metricNow">—</strong></div>
+            <div><span id="metricLabelNormal">VS 1991–2020 NORMAL</span><strong id="metricNormal">—</strong></div>
+            <div><span id="metricLabelRecord">CHANGE SINCE EARLY RECORD</span><strong id="metricRecord">—</strong></div>
+            <div><span id="metricLabelConfidence">SOURCE AGREEMENT</span><strong id="metricConfidence">—</strong></div>
+          </div>
+
+          <div class="trend-block">
+            <div class="trend-head"><span id="trendHeadLabel">Change through time</span><span id="recordPeriod">record period: —</span></div>
+            <div class="trend-placeholder" id="trendChart">
+              <span>Historical chart appears here when a verified series is connected.</span>
+            </div>
+          </div>
+
+          <div class="card-actions">
+            <button id="explainBtn">Explain it</button>
+            <button id="evidenceBtn">Show evidence</button>
+            <button id="actionBtn" class="accent">What can I do?</button>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <section class="drawer" id="drawer" aria-hidden="true">
+      <div class="drawer-head">
+        <div>
+          <div class="drawer-eyebrow" id="drawerEyebrow">EARTH EVIDENCE</div>
+          <h2 id="drawerTitle">Trust & sources</h2>
+        </div>
+        <button class="close" id="drawerClose" aria-label="Close">×</button>
+      </div>
+      <div id="drawerBody" class="drawer-body"></div>
+    </section>
+    <div class="scrim" id="scrim"></div>
+  </div>
+
+  <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+  <script>
+const PLACES = {
+  'wales': { name: 'Wales', center: [-3.7, 52.35], zoom: 5.7 },
+  'carmarthenshire': { name: 'Carmarthenshire, Wales', center: [-4.16, 51.86], zoom: 8.3 },
+  'spain': { name: 'Spain', center: [-3.7, 40.2], zoom: 5.2 },
+  'antarctica': { name: 'Antarctica', center: [0, -81], zoom: 2.1 },
+  'australia': { name: 'Australia', center: [134.4, -25.3], zoom: 3.3 },
+  'greenland': { name: 'Greenland', center: [-42, 72], zoom: 3.3 },
+  'amazon': { name: 'Amazon Basin', center: [-62, -4], zoom: 4.0 },
+};
+
+const layerLabels = {
+  heat: 'Temperature / heat',
+  fire: 'Wildfire',
+  ocean: 'Ocean temperature',
+  ice: 'Sea ice',
+  water: 'Rain / drought',
+  biodiversity: 'Biodiversity',
+  rivers: 'River health',
+};
+
+const sourcePlans = {
+  heat: 'Local daily evidence: NASA POWER + ERA5. Global colour view: NOAA NOAAGlobalTemp monthly 5° temperature-anomaly data relative to 1991–2020. The map always labels the month actually returned by the NOAA source.',
+  fire: 'NASA GIBS VIIRS vector detections from NOAA-20 and NOAA-21. Earth Evidence clusters the underlying point records to reduce overplotting. These are satellite-detected thermal anomalies / active-fire candidates, not automatically confirmed wildfires.',
+  ocean: 'Source review required before activation; values remain unavailable until provenance and uncertainty are approved.',
+  ice: 'Source review required before activation; values remain unavailable until provenance and uncertainty are approved.',
+  water: 'Global source review plus a Wales pilot using official Natural Resources Wales data where appropriate.',
+  biodiversity: 'Planned evidence stack: GBIF occurrence records and other approved biodiversity datasets; threatened-species status/range sources will be added only where licensing and methodology are appropriate. Earth Evidence will distinguish observation effort from real ecological change.',
+  rivers: 'Planned river-health stack: official water-quality chemistry, ecological status and biological monitoring. Wales/UK pilot sources will include Natural Resources Wales and relevant Defra/Environment Agency datasets where licensed and available.',
+};
+
+let activeLayer = 'heat';
+let selectedPlace = null;
+let selectedCoords = null;
+let latestTemperatureBundle = null;
+let latestFireEvents = [];
+let latestFireGeojson = {type:'FeatureCollection',features:[]};
+let selectedFireEvent = null;
+let fireLoadedAt = null;
+let fireMarkers = [];
+let requestSerial = 0;
+const HEAT_SOURCE_ID='ee-noaa-heat-grid';
+const HEAT_LAYER_ID='ee-noaa-heat-grid-fill';
+const FIRE_POINT_SOURCE_ID='ee-fire-point-source';
+const FIRE_POINT_LAYER_ID='ee-fire-point-circles';
+const FIRE_POINT_LABEL_ID='ee-fire-point-labels';
+let heatGridLoaded=false;
+let heatGridLoading=false;
+let heatGridError='';
+let heatGridCount=0;
+let heatMapLabel='latest NOAA monthly grid';
+let heatMapSource='NOAA NOAAGlobalTemp';
+let gibsFireDate=null;
+let firePointLoading=false;
+let firePointError='';
+let firePointCount=0;
+let fireRawCount=0;
+let firePointFetchedAt='';
+let fireRefreshTimer=null;
+
+let map = null;
+const isMobile = window.matchMedia('(max-width: 820px)').matches;
+function startMap() {
+  if (!window.maplibregl) {
+    document.getElementById('map').classList.add('fallback-earth');
+    document.getElementById('map').innerHTML = '<div class="fallback-copy"><strong>EARTH EVIDENCE</strong><span>Interactive globe renderer did not start. Try refreshing once; if it still fails, this browser may be blocking WebGL.</span></div>';
+    return;
+  }
+  try {
+    map = new maplibregl.Map({
+      container: 'map',
+      style: 'https://demotiles.maplibre.org/style.json',
+      center: isMobile ? [0, 12] : [-18, 24],
+      zoom: isMobile ? 0.65 : 1.55,
+      attributionControl: true,
+      antialias: true,
+    });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: true, showZoom: true }), 'bottom-left');
+    map.on('load', () => {
+      try { map.setProjection({ type: 'globe' }); } catch (e) {}
+      if (isMobile) { try { map.setPadding({ top: 18, bottom: 92, left: 0, right: 0 }); } catch (e) {} }
+      installFirePointLayer();
+      ensureHeatGrid();
+      updateScienceOverlayVisibility();
+    });
+    map.on('moveend',()=>{ if(activeLayer==='fire') scheduleFirePointRefresh(); });
+    map.on('zoomend',()=>{ if(activeLayer==='fire') scheduleFirePointRefresh(); });
+    map.on('click', (ev) => {
+      if (activeLayer === 'fire') {
+        selectedCoords = { lat: ev.lngLat.lat, lon: ev.lngLat.lng };
+        selectedPlace = {
+          name: `${Math.abs(ev.lngLat.lat).toFixed(2)}°${ev.lngLat.lat >= 0 ? 'N' : 'S'}, ${Math.abs(ev.lngLat.lng).toFixed(2)}°${ev.lngLat.lng >= 0 ? 'E' : 'W'}`,
+          center: [ev.lngLat.lng, ev.lngLat.lat],
+        };
+        const hits=map.queryRenderedFeatures(ev.point,{layers:[FIRE_POINT_LAYER_ID]});
+        if(hits && hits.length){ showFirePointDetails(hits[0].properties||{}); }
+        else showFirePointOverview();
+        return;
+      }
+      selectedFireEvent = null;
+      selectedCoords = { lat: ev.lngLat.lat, lon: ev.lngLat.lng };
+      selectedPlace = {
+        name: `${Math.abs(ev.lngLat.lat).toFixed(2)}°${ev.lngLat.lat >= 0 ? 'N' : 'S'}, ${Math.abs(ev.lngLat.lng).toFixed(2)}°${ev.lngLat.lng >= 0 ? 'E' : 'W'}`,
+        center: [ev.lngLat.lng, ev.lngLat.lat],
+      };
+      updateCard();
+    });
+  } catch (e) {
+    document.getElementById('map').classList.add('fallback-earth');
+    document.getElementById('map').innerHTML = '<div class="fallback-copy"><strong>EARTH EVIDENCE</strong><span>Globe loading problem. Please refresh once. Earth Evidence uses WebGL for the interactive globe.</span></div>';
+  }
+}
+startMap();
+
+function isoDateDaysAgo(days){
+  const d=new Date(); d.setUTCDate(d.getUTCDate()-days);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+}
+function prettyMonthFromIso(s){
+  if(!s) return 'latest NOAA monthly grid';
+  const m=String(s).match(/(\d{4})-(\d{2})/); if(!m) return String(s);
+  return new Intl.DateTimeFormat(undefined,{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(Date.UTC(Number(m[1]),Number(m[2])-1,1)));
+}
+function setMapLegend(kind){
+  const el=document.getElementById('mapLegend'); if(!el) return;
+  if(kind==='heat'){
+    const state=heatGridLoaded?`${heatGridCount.toLocaleString()} NOAA grid cells loaded`:(heatGridLoading?'Loading NOAA climate grid…':(heatGridError?'Global colour grid unavailable — local point evidence still works':'Preparing NOAA climate grid…'));
+    el.innerHTML=`<div class="legend-title">Temperature anomaly · ${heatMapLabel}</div><div class="legend-sub">${heatMapSource} · anomaly vs 1991–2020 · ${state}</div><div class="heat-scale"></div><div class="legend-ticks"><span>colder than average</span><span>near average</span><span>warmer than average</span></div><div class="legend-warning">Monthly climate evidence, not today's weather. Tap anywhere for near-current NASA + ERA5 daily evidence.</div>${heatGridError?'<a class="legend-link" href="https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/global/mapping" target="_blank" rel="noopener">Open NOAA official map ↗</a>':''}`;
+    el.classList.add('show'); return;
+  }
+  if(kind==='fire'){
+    const date=gibsFireDate||'latest available satellite day';
+    const state=firePointLoading?'loading…':(firePointError?'feed unavailable':`${firePointCount.toLocaleString()} displayed clusters / points from ${fireRawCount.toLocaleString()} detections`);
+    el.innerHTML=`<div class="legend-title">Satellite thermal anomalies · ${date}</div><div class="legend-sub">NASA GIBS VIIRS · ${state}</div><div class="fire-point-key"><span class="fire-dot-key"></span><span>Thermal anomaly / active-fire candidate</span></div><div class="legend-warning">Numbers inside circles are clustered detection counts. Zoom in to split clusters into finer groups and individual detections. These are not burned-area polygons and not every anomaly is a wildfire.</div>`;
+    el.classList.add('show'); return;
+  }
+  el.classList.remove('show'); el.innerHTML='';
+}
+function setOverlayLayerVisible(id,on){
+  if(!map||!map.getLayer(id)) return;
+  try{ map.setLayoutProperty(id,'visibility',on?'visible':'none'); }catch(e){}
+}
+function updateScienceOverlayVisibility(){
+  setOverlayLayerVisible(HEAT_LAYER_ID,activeLayer==='heat');
+  setOverlayLayerVisible(FIRE_POINT_LAYER_ID,activeLayer==='fire');
+  setOverlayLayerVisible(FIRE_POINT_LABEL_ID,activeLayer==='fire');
+  setMapLegend(activeLayer==='heat'?'heat':activeLayer==='fire'?'fire':null);
+}
+function installFirePointLayer(){
+  if(!map) return;
+  try{
+    if(!map.getSource(FIRE_POINT_SOURCE_ID)) map.addSource(FIRE_POINT_SOURCE_ID,{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+    if(!map.getLayer(FIRE_POINT_LAYER_ID)) map.addLayer({
+      id:FIRE_POINT_LAYER_ID,type:'circle',source:FIRE_POINT_SOURCE_ID,layout:{visibility:'none'},
+      paint:{
+        'circle-radius':['interpolate',['linear'],['coalesce',['get','count'],1],1,4,5,7,20,11,100,17,500,23],
+        'circle-color':['interpolate',['linear'],['coalesce',['get','count'],1],1,'#ffb13b',5,'#ff8a32',20,'#f45a2a',100,'#d83424',500,'#a91f28'],
+        'circle-opacity':0.78,
+        'circle-stroke-width':['case',['>', ['coalesce',['get','count'],1],1],1.5,1],
+        'circle-stroke-color':'#fff0df'
+      }
+    });
+    if(!map.getLayer(FIRE_POINT_LABEL_ID)) map.addLayer({
+      id:FIRE_POINT_LABEL_ID,type:'symbol',source:FIRE_POINT_SOURCE_ID,minzoom:0,layout:{visibility:'none','text-field':['case',['>', ['coalesce',['get','count'],1],1],['to-string',['get','count']],''],'text-size':10,'text-font':['Open Sans Bold']},paint:{'text-color':'#ffffff','text-halo-color':'rgba(0,0,0,.65)','text-halo-width':1}
+    });
+  }catch(e){ console.warn('Fire point layer install failed',e); }
+}
+function currentFireBbox(){
+  if(!map || map.getZoom()<2.25) return [-180,-85,180,85];
+  const b=map.getBounds();
+  let w=Math.max(-180,Math.min(180,b.getWest())), e=Math.max(-180,Math.min(180,b.getEast()));
+  let s=Math.max(-85,Math.min(85,b.getSouth())), n=Math.max(-85,Math.min(85,b.getNorth()));
+  if(e<=w || (e-w)>350) return [-180,s,180,n];
+  return [w,s,e,n];
+}
+function scheduleFirePointRefresh(){
+  clearTimeout(fireRefreshTimer);
+  fireRefreshTimer=setTimeout(()=>refreshFirePoints(),220);
+}
+async function refreshFirePoints(){
+  if(!map || activeLayer!=='fire' || firePointLoading) return;
+  firePointLoading=true; firePointError=''; setMapLegend('fire');
+  try{
+    const bbox=currentFireBbox(); const z=map.getZoom();
+    const u=new URL('/.netlify/functions/fire-points',window.location.origin);
+    u.searchParams.set('bbox',bbox.map(v=>v.toFixed(4)).join(',')); u.searchParams.set('zoom',z.toFixed(2));
+    const r=await fetch(u.toString(),{cache:'no-store',headers:{Accept:'application/json'}});
+    let payload={};
+    try{ payload=await r.json(); }catch(e){}
+    if(!r.ok) throw new Error(payload?.error ? `fire relay: ${payload.error}` : `fire relay HTTP ${r.status}`);
+    const features=Array.isArray(payload.features)?payload.features:[];
+    firePointCount=features.length; fireRawCount=Number(payload.rawCount||0); firePointFetchedAt=payload.fetchedAt||''; gibsFireDate=payload.date||gibsFireDate;
+    const fc={type:'FeatureCollection',features:features.map((f,i)=>({type:'Feature',id:i,geometry:{type:'Point',coordinates:[Number(f.lon),Number(f.lat)]},properties:{count:Number(f.count||1),date:f.date||'',satellites:f.satellites||'',confidence:f.confidence||'',frp:Number.isFinite(Number(f.frp))?Number(f.frp):0,daynight:f.daynight||'',acqTime:f.acqTime||'',brightness:Number.isFinite(Number(f.brightness))?Number(f.brightness):0,sourceCount:Number(f.sourceCount||f.count||1)}}))};
+    const src=map.getSource(FIRE_POINT_SOURCE_ID); if(src) src.setData(fc);
+    setMapLegend('fire');
+  }catch(e){ firePointError=String(e?.message||e); const src=map.getSource(FIRE_POINT_SOURCE_ID); if(src) src.setData({type:'FeatureCollection',features:[]}); setMapLegend('fire'); console.warn('Fire point feed unavailable',e); }
+  finally{ firePointLoading=false; updateScienceOverlayVisibility(); }
+}
+function showFirePointOverview(){
+  setMetricLabels('fire'); $('eventCard').classList.remove('compact'); $('cardEyebrow').textContent='FIRE · NASA VIIRS POINT DATA'; $('cardTitle').textContent=selectedPlace?.name||'Satellite thermal-anomaly detections';
+  $('cardSub').innerHTML=`Earth Evidence is displaying clustered NASA GIBS VIIRS point detections from NOAA-20 and NOAA-21 for <strong>${gibsFireDate||'the latest available day'}</strong>. Zoom in to separate clusters.<div class="live-pill">NASA GIBS · VIIRS VECTOR DATA</div>`;
+  $('metricNow').textContent=gibsFireDate||'Latest available'; $('metricNormal').textContent=`${fireRawCount.toLocaleString()} detections in view`; $('metricRecord').textContent='Not claimed'; $('metricConfidence').textContent='Satellite thermal anomaly';
+  $('recordPeriod').textContent='snapshot: satellite detection day'; $('trendChart').innerHTML='<span>Tap a circle for acquisition time, satellite, confidence/quality field, FRP and day/night information where supplied by the NASA vector record.</span>';
+}
+function showFirePointDetails(p){
+  setMetricLabels('fire'); $('eventCard').classList.remove('compact'); const count=Number(p.count||1); $('cardEyebrow').textContent='FIRE · NASA VIIRS POINT DATA'; $('cardTitle').textContent=count>1?`${count} clustered thermal detections`:'Satellite thermal detection';
+  $('cardSub').innerHTML=`This symbol represents ${count>1?`a cluster of <strong>${count}</strong> satellite detections at the current map scale`:'one satellite thermal-anomaly detection'}. It is an active-fire candidate, not automatic proof of a wildfire.<div class="live-pill">NASA GIBS · VIIRS VECTOR DATA</div>`;
+  $('metricNow').textContent=p.date||gibsFireDate||'Date unavailable'; $('metricNormal').textContent=p.satellites||'NOAA-20 / NOAA-21'; $('metricRecord').textContent=Number(p.frp)>0?`${Number(p.frp).toFixed(1)} MW max/representative FRP`:'FRP unavailable'; $('metricConfidence').textContent=p.confidence||'Quality field varies by product';
+  $('recordPeriod').textContent=p.acqTime?`acquisition: ${p.acqTime}`:'acquisition time: unavailable';
+  $('trendChart').innerHTML=`<span>${p.daynight?`Day/night: ${p.daynight} · `:''}${Number(p.brightness)>0?`Brightness: ${Number(p.brightness).toFixed(1)} K · `:''}Zoom in further to reduce clustering. Earth Evidence does not infer ignition cause, burned area or climate attribution from this detection.</span>`;
+}
+
+function normaliseGridLon(lon){ lon=Number(lon); while(lon>180)lon-=360; while(lon<-180)lon+=360; return lon; }
+function addHeatPoint(out,lat,lon,val){
+  lat=Number(lat); lon=normaliseGridLon(lon); val=Number(val);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)||!Number.isFinite(val)||Math.abs(lat)>90||Math.abs(lon)>180||Math.abs(val)>50)return;
+  const k=`${lat.toFixed(3)},${lon.toFixed(3)}`; if(out._seen.has(k))return; out._seen.add(k); out.push({lat,lon,value:val});
+}
+function parseSimpleCsv(text){
+  const rawLines=String(text).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  if(rawLines.length<2)return {points:[],date:''};
+  const split=line=>{const out=[];let str='',q=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){q=!q;continue;}if(ch===','&&!q){out.push(str.trim());str='';}else str+=ch;}out.push(str.trim());return out;};
+  // NOAA CAG downloads may begin with a human-readable title before the header.
+  let headerIndex=rawLines.findIndex(line=>{const h=split(line).map(x=>x.toLowerCase());return h.some(x=>x==='lat'||x==='latitude')&&h.some(x=>x==='lon'||x==='longitude')&&h.some(x=>x.includes('anomaly')||x==='value'||x==='departure'||x==='air');});
+  if(headerIndex<0) headerIndex=0;
+  const h=split(rawLines[headerIndex]).map(x=>x.toLowerCase());
+  const idx=(names)=>h.findIndex(x=>names.some(n=>x===n||x.includes(n)));
+  const ilat=idx(['lat','latitude']), ilon=idx(['lon','longitude']), ival=idx(['anomaly','air','value','departure']), itime=idx(['time','date','period']);
+  if(ilat<0||ilon<0||ival<0)return {points:[],date:''};
+  const pts=[]; pts._seen=new Set(); let date='';
+  for(let i=headerIndex+1;i<rawLines.length;i++){
+    const r=split(rawLines[i]);
+    if(r.length<=Math.max(ilat,ilon,ival)) continue;
+    if(!date&&itime>=0)date=r[itime]||'';
+    addHeatPoint(pts,r[ilat],r[ilon],r[ival]);
+  }
+  delete pts._seen; return {points:pts,date};
+}
+function extractNoaaJsonPoints(payload){
+  const pts=[]; pts._seen=new Set(); let date='';
+  const valueKeys=['anomaly','value','departure','temperature','temp','tavg','air'];
+  function walk(node,path=[]){
+    if(node==null)return;
+    if(Array.isArray(node)){ for(const x of node) walk(x,path); return; }
+    if(typeof node!=='object')return;
+    const lower={}; Object.entries(node).forEach(([k,v])=>lower[k.toLowerCase()]=v);
+    if(!date) date=lower.time||lower.date||lower.period||'';
+    const lat=lower.latitude??lower.lat??lower.y, lon=lower.longitude??lower.lon??lower.lng??lower.x;
+    let val=null; for(const k of valueKeys){if(lower[k]!==null&&lower[k]!==undefined&&Number.isFinite(Number(lower[k]))){val=lower[k];break;}}
+    if(lat!==undefined&&lon!==undefined&&val!==null)addHeatPoint(pts,lat,lon,val);
+    for(const [k,v] of Object.entries(node)){const num=/^-?\d+(?:\.\d+)?$/.test(k)?Number(k):null;walk(v,num===null?path:[...path,num]);}
+  }
+  walk(payload); delete pts._seen; return {points:pts,date};
+}
+function heatPointsGeojson(points){
+  return {type:'FeatureCollection',features:points.map(p=>{const h=2.5,w=Math.max(-180,p.lon-h),e=Math.min(180,p.lon+h),s=Math.max(-90,p.lat-h),n=Math.min(90,p.lat+h);return {type:'Feature',properties:{anomaly:p.value},geometry:{type:'Polygon',coordinates:[[[w,s],[e,s],[e,n],[w,n],[w,s]]]}};})};
+}
+async function fetchNoaaHeatGrid(){
+  // V1.5 primary path: Earth Evidence's own Netlify server function.
+  // This avoids browser CORS/reliability problems when talking directly to NOAA.
+  try{
+    const r=await fetch('/.netlify/functions/noaa-heat-grid',{cache:'no-store',headers:{Accept:'application/json'}});
+    if(r.ok){
+      const payload=await r.json();
+      if(Array.isArray(payload.points)&&payload.points.length>100){
+        return {points:payload.points,label:payload.label||prettyMonthFromIso(payload.date),source:payload.source||'NOAA NOAAGlobalTemp'};
+      }
+      throw new Error(`server relay returned ${payload?.points?.length||0} cells`);
+    }
+    throw new Error(`server relay HTTP ${r.status}`);
+  }catch(serverErr){
+    console.warn('Earth Evidence NOAA relay unavailable; trying direct fallback',serverErr);
+  }
+
+  // Static/direct fallback for local testing or if Netlify Functions are unavailable.
+  const cag='https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/global/mapping/tavg/202608/anomaly';
+  const attempts=[
+    {u:`${cag}/data.csv`,kind:'csv',label:'August 2026',source:'NOAA Climate at a Glance / NOAAGlobalTemp v6.1'},
+    {u:`${cag}/data.json`,kind:'json',label:'August 2026',source:'NOAA Climate at a Glance / NOAAGlobalTemp v6.1'},
+    {u:'https://psl.noaa.gov/thredds/ncss/grid/Datasets/noaaglobaltemp/v6.1/air.mon.anom.v6.1.nc?var=air&north=90&west=0&east=360&south=-90&horizStride=1&time=present&accept=csv',kind:'csv',label:'',source:'NOAA PSL · NOAAGlobalTemp v6.1'}
+  ];
+  const errs=[];
+  for(const a of attempts){
+    try{
+      const r=await fetch(a.u,{cache:'no-store'}); if(!r.ok){errs.push(`${r.status}`);continue;}
+      const txt=await r.text(); if(/^\s*</.test(txt)){errs.push('HTML response');continue;}
+      let parsed;
+      if(a.kind==='json'){try{parsed=extractNoaaJsonPoints(JSON.parse(txt));}catch(e){errs.push('invalid JSON');continue;}}
+      else parsed=parseSimpleCsv(txt);
+      if(parsed.points.length>100){return {points:parsed.points,label:a.label||prettyMonthFromIso(parsed.date),source:a.source};}
+      errs.push(`${parsed.points.length} cells`);
+    }catch(e){errs.push(String(e?.message||e));}
+  }
+  throw new Error(errs.slice(0,6).join(' · ')||'NOAA global anomaly grid unavailable');
+}
+async function ensureHeatGrid(){
+  if(heatGridLoaded||heatGridLoading||!map)return;
+  heatGridLoading=true; heatGridError=''; setMapLegend(activeLayer==='heat'?'heat':null);
+  try{
+    const result=await fetchNoaaHeatGrid(); heatGridCount=result.points.length; heatMapLabel=result.label||'latest NOAA monthly grid'; heatMapSource=result.source;
+    const data=heatPointsGeojson(result.points);
+    if(!map.getSource(HEAT_SOURCE_ID))map.addSource(HEAT_SOURCE_ID,{type:'geojson',data});else map.getSource(HEAT_SOURCE_ID).setData(data);
+    if(!map.getLayer(HEAT_LAYER_ID))map.addLayer({id:HEAT_LAYER_ID,type:'fill',source:HEAT_SOURCE_ID,layout:{visibility:activeLayer==='heat'?'visible':'none'},paint:{'fill-color':['interpolate',['linear'],['get','anomaly'],-8,'#193a8a',-4,'#4f8bc9',-2,'#cfe6f4',0,'#f5f5f1',2,'#f9c56e',4,'#ea6b3a',8,'#9d1f2f'],'fill-opacity':0.62,'fill-outline-color':'rgba(255,255,255,.035)'}});
+    heatGridLoaded=true;
+  }catch(e){ heatGridError=String(e?.message||e); console.warn('NOAA heat shading unavailable',e); }
+  finally{ heatGridLoading=false; updateScienceOverlayVisibility(); }
+}
+function showSatelliteFireOverview(){ showFirePointOverview(); }
+
+
+function clearFireMarkers() {
+  for (const m of fireMarkers) { try { m.remove(); } catch(e) {} }
+  fireMarkers = [];
+}
+function refreshFireMarkers() {
+  if (!map || !window.maplibregl) return;
+  clearFireMarkers();
+  for (const ev of latestFireEvents) {
+    if (!Number.isFinite(ev.lon) || !Number.isFinite(ev.lat)) continue;
+    const el=document.createElement('button');
+    el.type='button';
+    el.className='fire-marker'+(ev.status==='recent'?' recent':'');
+    el.setAttribute('aria-label', `Wildfire: ${ev.title}`);
+    el.title=ev.title;
+    el.hidden = activeLayer !== 'fire';
+    el.addEventListener('click',(e)=>{
+      e.stopPropagation();
+      selectedFireEvent=ev;
+      selectedCoords={lat:ev.lat,lon:ev.lon};
+      selectedPlace={name:ev.title,center:[ev.lon,ev.lat]};
+      showFireEvent(ev);
+    });
+    try {
+      const marker=new maplibregl.Marker({element:el,anchor:'center'}).setLngLat([ev.lon,ev.lat]).addTo(map);
+      marker.__eeElement=el;
+      fireMarkers.push(marker);
+    } catch(e) {}
+  }
+  setFireVisibility(activeLayer==='fire');
+}
+function setFireVisibility(on) {
+  for (const marker of fireMarkers) {
+    const el=marker.__eeElement || marker.getElement?.();
+    if (el) el.hidden=!on;
+  }
+}
+function fireCacheRead() {
+  try {
+    const raw=localStorage.getItem('ee:eonet:wildfires:v3');
+    if(!raw) return null;
+    const obj=JSON.parse(raw);
+    if(Date.now()-new Date(obj.fetchedAt).getTime()>15*60*1000) return null;
+    return obj;
+  } catch(e){ return null; }
+}
+function fireCacheWrite(obj){ try{localStorage.setItem('ee:eonet:wildfires:v3',JSON.stringify(obj));}catch(e){} }
+function eventPoint(geometries) {
+  const arr=Array.isArray(geometries)?geometries:[];
+  for(let i=arr.length-1;i>=0;i--){
+    const g=arr[i]; if(!g||!g.coordinates) continue;
+    if(g.type==='Point' && Array.isArray(g.coordinates)) return {lon:Number(g.coordinates[0]),lat:Number(g.coordinates[1]),date:g.date||''};
+    if(g.type==='LineString' && Array.isArray(g.coordinates)&&g.coordinates.length){ const c=g.coordinates[g.coordinates.length-1]; return {lon:Number(c[0]),lat:Number(c[1]),date:g.date||''}; }
+    if(g.type==='Polygon' && Array.isArray(g.coordinates?.[0])&&g.coordinates[0].length){ const ring=g.coordinates[0]; const lon=ring.reduce((a,c)=>a+Number(c[0]),0)/ring.length; const lat=ring.reduce((a,c)=>a+Number(c[1]),0)/ring.length; return {lon,lat,date:g.date||''}; }
+  }
+  return null;
+}
+function normaliseEonet(data,status="open"){
+  const features=[]; const events=[];
+  for(const e of (data?.events||[])){
+    const pt=eventPoint(e.geometry); if(!pt||!Number.isFinite(pt.lat)||!Number.isFinite(pt.lon)) continue;
+    const srcs=Array.isArray(e.sources)?e.sources:[];
+    const sourceText=srcs.map(s=>s.id||s.title).filter(Boolean).join(', ')||'NASA EONET';
+    const sourceLinks=srcs.map(s=>({id:s.id||'',url:s.url||s.source||''})).filter(s=>s.id||s.url);
+    const ev={id:e.id||'',title:e.title||'Wildfire event',description:e.description||'',date:pt.date||'',lat:pt.lat,lon:pt.lon,sourceText,sourceLinks,eventLink:e.link||'',magnitudeValue:e.magnitudeValue,magnitudeUnit:e.magnitudeUnit,status};
+    events.push(ev);
+    features.push({type:'Feature',geometry:{type:'Point',coordinates:[pt.lon,pt.lat]},properties:{
+      id:ev.id,title:ev.title,description:ev.description,date:ev.date,lat:ev.lat,lon:ev.lon,sourceText:ev.sourceText,sourceLinks:JSON.stringify(ev.sourceLinks),eventLink:ev.eventLink,magnitudeValue:ev.magnitudeValue??'',magnitudeUnit:ev.magnitudeUnit??''
+    }});
+  }
+  return {events,geojson:{type:'FeatureCollection',features}};
+}
+async function loadFireEvents(force=false){
+  if(!force){
+    const cached=fireCacheRead();
+    if(cached){
+      latestFireEvents=cached.events||[];
+      latestFireGeojson=cached.geojson||{type:'FeatureCollection',features:[]};
+      fireLoadedAt=cached.fetchedAt;
+      refreshFireMarkers();
+      updateFireButtonCount();
+      return cached;
+    }
+  }
+  const openUrl='https://eonet.gsfc.nasa.gov/api/v3/events?category=wildfires&status=open&limit=500';
+  const recentUrl='https://eonet.gsfc.nasa.gov/api/v3/events?category=wildfires&status=closed&days=30&limit=500';
+  const [openRes,recentRes]=await Promise.allSettled([
+    fetch(openUrl,{headers:{Accept:'application/json'},cache:'no-store'}),
+    fetch(recentUrl,{headers:{Accept:'application/json'},cache:'no-store'})
+  ]);
+  let openData={events:[]}, recentData={events:[]};
+  if(openRes.status==='fulfilled' && openRes.value.ok) openData=await openRes.value.json();
+  if(recentRes.status==='fulfilled' && recentRes.value.ok) recentData=await recentRes.value.json();
+  if((openRes.status!=='fulfilled' || !openRes.value.ok) && (recentRes.status!=='fulfilled' || !recentRes.value.ok)) {
+    throw new Error('NASA EONET wildfire requests did not complete.');
+  }
+  const a=normaliseEonet(openData,'open');
+  const b=normaliseEonet(recentData,'recent');
+  const byId=new Map();
+  for(const ev of [...a.events,...b.events]) { const key=ev.id || `${ev.title}:${ev.lat}:${ev.lon}`; if(!byId.has(key)) byId.set(key,ev); }
+  const events=[...byId.values()];
+  const features=events.map(ev=>({type:'Feature',geometry:{type:'Point',coordinates:[ev.lon,ev.lat]},properties:{id:ev.id,title:ev.title,date:ev.date,status:ev.status}}));
+  const result={events,geojson:{type:'FeatureCollection',features},fetchedAt:new Date().toISOString(),openCount:a.events.length,recentCount:b.events.length};
+  latestFireEvents=events; latestFireGeojson=result.geojson; fireLoadedAt=result.fetchedAt; fireCacheWrite(result);
+  refreshFireMarkers();
+  updateFireButtonCount();
+  return result;
+}
+function updateFireButtonCount(){
+  const btn=document.querySelector('.layer[data-layer="fire"]');
+  if(!btn) return;
+  btn.innerHTML=`<span>◉</span> Fire${latestFireEvents.length?` (${latestFireEvents.length})`:''}`;
+}
+function setMetricLabels(kind){
+  if(kind==='fire'){
+    $('metricLabelNow').textContent='DETECTION DATE'; $('metricLabelNormal').textContent='SATELLITE / COUNT'; $('metricLabelRecord').textContent='FIRE RADIATIVE POWER'; $('metricLabelConfidence').textContent='QUALITY / EVIDENCE'; $('trendHeadLabel').textContent='Fire evidence';
+  } else {
+    $('metricLabelNow').textContent='LATEST DAILY MEAN'; $('metricLabelNormal').textContent='VS 1991–2020 NORMAL'; $('metricLabelRecord').textContent='CHANGE SINCE EARLY RECORD'; $('metricLabelConfidence').textContent='SOURCE AGREEMENT'; $('trendHeadLabel').textContent='Change through time';
+  }
+}
+function showFireOverview(errorMsg=''){
+  setMetricLabels('fire'); $('eventCard').classList.remove('compact'); $('cardEyebrow').textContent='WILDFIRE · NASA EONET'; $('cardTitle').textContent=errorMsg?'Wildfire feed unavailable':'Near-real-time wildfire events';
+  $('cardSub').innerHTML=errorMsg ? `NASA EONET did not load. Earth Evidence will not invent fire locations.<div class="live-pill">NO FIRE CLAIM MADE</div>` : `NASA EONET currently has <strong>${latestFireEvents.length}</strong> open or recently closed wildfire events loaded. ${latestFireEvents.length ? 'Tap an orange marker to inspect an event.' : 'No EONET wildfire events were returned for this window; Earth Evidence will not invent markers.'}<div class="live-pill">NASA EONET · CURATED EVENT FEED</div>`;
+  $('metricNow').textContent=errorMsg?'Unavailable':(fireLoadedAt?new Date(fireLoadedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):'Loaded');
+  $('metricNormal').textContent=errorMsg?'Unavailable':'Open + recent'; $('metricRecord').textContent='Not claimed'; $('metricConfidence').textContent='Curated metadata';
+  $('recordPeriod').textContent='window: open events + recently closed 30 days';
+  $('trendChart').innerHTML=errorMsg?`<span>${errorMsg}</span>`:'<span>This layer maps curated wildfire events, not every satellite fire hotspot. NASA FIRMS hotspot detections are the next upgrade.</span>';
+}
+function showFireEvent(ev){
+  setMetricLabels('fire'); $('eventCard').classList.remove('compact'); $('cardEyebrow').textContent='WILDFIRE · NASA EONET'; $('cardTitle').textContent=ev.title;
+  $('cardSub').innerHTML=`Curated wildfire event metadata from NASA EONET. This confirms an event record, <strong>not</strong> its cause, burned area or climate attribution.<div class="live-pill">NASA EONET EVENT</div>`;
+  $('metricNow').textContent=ev.date?new Date(ev.date).toLocaleDateString():'Date not supplied'; $('metricNormal').textContent=ev.status==='open'?'Open event':'Recently closed';
+  $('metricRecord').textContent=(ev.magnitudeValue!==''&&ev.magnitudeValue!=null)?`${ev.magnitudeValue}${ev.magnitudeUnit?' '+ev.magnitudeUnit:''}`:'Not supplied'; $('metricConfidence').textContent='Curated event metadata';
+  $('recordPeriod').textContent='historical fire trend: not claimed';
+  $('trendChart').innerHTML=`<span>Location: ${Math.abs(ev.lat).toFixed(2)}°${ev.lat>=0?'N':'S'}, ${Math.abs(ev.lon).toFixed(2)}°${ev.lon>=0?'E':'W'} · Source: ${ev.sourceText||'NASA EONET'}</span>`;
+}
+
+const $ = (id) => document.getElementById(id);
+const drawer = $('drawer');
+const scrim = $('scrim');
+
+function openDrawer(title, eyebrow, html) {
+  $('drawerTitle').textContent = title;
+  $('drawerEyebrow').textContent = eyebrow;
+  $('drawerBody').innerHTML = html;
+  drawer.classList.add('open');
+  drawer.setAttribute('aria-hidden', 'false');
+  scrim.classList.add('show');
+}
+function closeDrawer() {
+  drawer.classList.remove('open');
+  drawer.setAttribute('aria-hidden', 'true');
+  scrim.classList.remove('show');
+}
+$('drawerClose').addEventListener('click', closeDrawer);
+scrim.addEventListener('click', closeDrawer);
+
+function isoToDisplay(key) {
+  if (!key || key.length !== 8) return key || '—';
+  const y = Number(key.slice(0,4));
+  const m = Number(key.slice(4,6));
+  const d = Number(key.slice(6,8));
+  return new Intl.DateTimeFormat(undefined, { day:'numeric', month:'short', year:'numeric', timeZone:'UTC' }).format(new Date(Date.UTC(y,m-1,d)));
+}
+function mean(arr) {
+  const good = arr.filter(Number.isFinite);
+  return good.length ? good.reduce((a,b)=>a+b,0)/good.length : null;
+}
+function fmtTemp(v, signed=false) {
+  if (!Number.isFinite(v)) return '—';
+  const sign = signed && v > 0 ? '+' : '';
+  return `${sign}${v.toFixed(1)}°C`;
+}
+function validPowerValue(v, fill=-999) {
+  return Number.isFinite(v) && v !== fill && v > -900 && v < 900;
+}
+function regression(points) {
+  if (!points || points.length < 2) return null;
+  const xs = points.map(p=>p.year), ys = points.map(p=>p.mean);
+  const xbar = mean(xs), ybar = mean(ys);
+  let num=0, den=0;
+  for (let i=0;i<points.length;i++) { num += (xs[i]-xbar)*(ys[i]-ybar); den += (xs[i]-xbar)**2; }
+  if (!den) return null;
+  return num/den;
+}
+function renderAnnualChart(annual, slope) {
+  if (!annual || annual.length < 2) return '<span>Not enough annual data to draw the trend.</span>';
+  const w=100, h=44, pad=3;
+  const vals=annual.map(d=>d.mean);
+  let minV=Math.min(...vals), maxV=Math.max(...vals);
+  if (maxV-minV < 0.4) { minV -= .2; maxV += .2; }
+  const path=annual.map((d,i)=>{
+    const x=pad + i*(w-pad*2)/(annual.length-1);
+    const y=pad + (maxV-d.mean)*(h-pad*2)/(maxV-minV);
+    return `${i?'L':'M'}${x.toFixed(2)},${y.toFixed(2)}`;
+  }).join(' ');
+  const first=annual[0], last=annual[annual.length-1];
+  const slopeTxt=Number.isFinite(slope) ? `${slope>=0?'+':''}${(slope*10).toFixed(2)}°C/decade linear trend` : 'trend unavailable';
+  return `<svg class="trend-svg" viewBox="0 0 100 44" preserveAspectRatio="none" role="img" aria-label="Annual mean temperature trend"><path d="${path}" fill="none" stroke="rgba(110,231,183,.95)" stroke-width="1.5" vector-effect="non-scaling-stroke"/><line x1="3" x2="97" y1="41" y2="41" stroke="rgba(255,255,255,.12)" stroke-width=".5"/></svg><div class="trend-meta"><span>${first.year}: ${first.mean.toFixed(1)}°C</span><span>${slopeTxt}</span><span>${last.year}: ${last.mean.toFixed(1)}°C</span></div>`;
+}
+function summarizePower(json, requestedLat, requestedLon) {
+  const params = json?.properties?.parameter || {};
+  const t2m = params.T2M || {};
+  const tmax = params.T2M_MAX || {};
+  const tmin = params.T2M_MIN || {};
+  const fill = json?.header?.fill_value ?? -999;
+  const keys = Object.keys(t2m).filter(k => /^\d{8}$/.test(k)).sort();
+  const rows=[];
+  for (const k of keys) {
+    const v=Number(t2m[k]);
+    if (!validPowerValue(v, fill)) continue;
+    rows.push({ key:k, year:Number(k.slice(0,4)), md:k.slice(4), mean:v, max:Number(tmax[k]), min:Number(tmin[k]) });
+  }
+  if (!rows.length) throw new Error('NASA POWER returned no valid temperature values for this point.');
+  const latest=rows[rows.length-1];
+  const baselineVals=rows.filter(r=>r.year>=1991 && r.year<=2020 && r.md===latest.md).map(r=>r.mean);
+  const baseline=mean(baselineVals);
+  const anomaly=Number.isFinite(baseline) ? latest.mean-baseline : null;
+  const sameDay=rows.filter(r=>r.md===latest.md).sort((a,b)=>b.mean-a.mean);
+  const rank=sameDay.findIndex(r=>r.key===latest.key)+1;
+  const annualMap=new Map();
+  for (const r of rows) {
+    if (!annualMap.has(r.year)) annualMap.set(r.year, []);
+    annualMap.get(r.year).push(r.mean);
+  }
+  const currentYear=new Date().getUTCFullYear();
+  const annual=[...annualMap.entries()].map(([year,vals])=>({year, mean:mean(vals), n:vals.length})).filter(d=>d.n>=350 && d.year<currentYear).sort((a,b)=>a.year-b.year);
+  const firstTen=annual.slice(0,10);
+  const lastTen=annual.slice(-10);
+  const earlyMean=mean(firstTen.map(d=>d.mean));
+  const recentMean=mean(lastTen.map(d=>d.mean));
+  const decadalChange=(Number.isFinite(earlyMean)&&Number.isFinite(recentMean)) ? recentMean-earlyMean : null;
+  const slope=regression(annual);
+  const recent=rows.slice(-20).map(r=>{
+    const b=mean(rows.filter(x=>x.year>=1991 && x.year<=2020 && x.md===r.md).map(x=>x.mean));
+    return {...r, baseline:b, anomaly:Number.isFinite(b)?r.mean-b:null};
+  });
+  const coords=json?.geometry?.coordinates || [];
+  return {
+    requestedLat, requestedLon,
+    dataLon:Number(coords[0]), dataLat:Number(coords[1]), elevation:Number(coords[2]),
+    latest, baseline, baselineN:baselineVals.length, anomaly,
+    rank, rankN:sameDay.length,
+    annual, slope,
+    decadalChange,
+    earlyRange:firstTen.length ? `${firstTen[0].year}–${firstTen[firstTen.length-1].year}` : '—',
+    recentRange:lastTen.length ? `${lastTen[0].year}–${lastTen[lastTen.length-1].year}` : '—',
+    recordStart:rows[0].key,
+    recordEnd:latest.key,
+    max: validPowerValue(latest.max, fill) ? latest.max : null,
+    min: validPowerValue(latest.min, fill) ? latest.min : null,
+    recent,
+    fetchedAt:new Date().toISOString(),
+  };
+}
+function cacheKey(lat,lon) {
+  // Approximate MERRA-2 grid key: 0.5° latitude x 0.625° longitude.
+  const rlat=Math.round(lat/0.5)*0.5;
+  const rlon=Math.round(lon/0.625)*0.625;
+  return `ee:nasa-power:t2m:${rlat.toFixed(3)}:${rlon.toFixed(3)}`;
+}
+function readCache(lat,lon) {
+  try {
+    const raw=localStorage.getItem(cacheKey(lat,lon));
+    if (!raw) return null;
+    const obj=JSON.parse(raw);
+    const age=Date.now()-new Date(obj.fetchedAt).getTime();
+    if (age > 24*3600*1000) return null;
+    return obj;
+  } catch(e) { return null; }
+}
+function writeCache(lat,lon,obj) {
+  try { localStorage.setItem(cacheKey(lat,lon), JSON.stringify(obj)); } catch(e) {}
+}
+function setLoadingCard(place) {
+  setMetricLabels('heat');
+  $("eventCard").classList.remove("compact");
+  $("cardEyebrow").textContent='TEMPERATURE · NASA + ERA5';
+  $("cardTitle").textContent=place;
+  $("cardSub").innerHTML='<span class="loading-line"><span class="spinner"></span>Loading NASA POWER and ERA5 temperature histories and comparing them…</span>';
+  $("metricNow").textContent='Loading…';
+  $("metricNormal").textContent='Calculating…';
+  $("metricRecord").textContent='Calculating…';
+  $("metricConfidence").textContent='Cross-checking…';
+  $("recordPeriod").textContent='record period: loading';
+  $("trendChart").innerHTML='<span>Processing the historical records…</span>';
+}
+async function fetchNasaTemperature(lat,lon,serial) {
+  const cached=readCache(lat,lon);
+  if (cached) return cached;
+  const today=new Date();
+  const end=`${today.getUTCFullYear()}${String(today.getUTCMonth()+1).padStart(2,'0')}${String(today.getUTCDate()).padStart(2,'0')}`;
+  const url=new URL('https://power.larc.nasa.gov/api/temporal/daily/point');
+  url.searchParams.set('parameters','T2M,T2M_MAX,T2M_MIN');
+  url.searchParams.set('community','SB');
+  url.searchParams.set('longitude',String(lon));
+  url.searchParams.set('latitude',String(lat));
+  url.searchParams.set('start','19810101');
+  url.searchParams.set('end',end);
+  url.searchParams.set('format','JSON');
+  url.searchParams.set('time-standard','UTC');
+  const response=await fetch(url.toString(), { headers:{'Accept':'application/json'} });
+  if (!response.ok) throw new Error(`NASA POWER request failed (${response.status}).`);
+  const json=await response.json();
+  if (serial !== requestSerial) throw new Error('superseded');
+  const summary=summarizePower(json,lat,lon);
+  writeCache(lat,lon,summary);
+  return summary;
+}
+function omCacheKey(lat,lon) {
+  const rlat=Math.round(lat/0.1)*0.1;
+  const rlon=Math.round(lon/0.1)*0.1;
+  return `ee:openmeteo:era5:t2m:${rlat.toFixed(1)}:${rlon.toFixed(1)}`;
+}
+function readOmCache(lat,lon) {
+  try {
+    const raw=localStorage.getItem(omCacheKey(lat,lon));
+    if (!raw) return null;
+    const obj=JSON.parse(raw);
+    const age=Date.now()-new Date(obj.fetchedAt).getTime();
+    if (age > 24*3600*1000) return null;
+    return obj;
+  } catch(e) { return null; }
+}
+function writeOmCache(lat,lon,obj) {
+  try { localStorage.setItem(omCacheKey(lat,lon), JSON.stringify(obj)); } catch(e) {}
+}
+function summarizeOpenMeteo(json, requestedLat, requestedLon) {
+  const daily=json?.daily || {};
+  const time=daily.time || [];
+  const meanVals=daily.temperature_2m_mean || [];
+  const maxVals=daily.temperature_2m_max || [];
+  const minVals=daily.temperature_2m_min || [];
+  const rows=[];
+  for (let i=0;i<time.length;i++) {
+    const dateStr=time[i];
+    const rawMean=meanVals[i];
+    if (rawMean === null || rawMean === undefined || rawMean === '') continue;
+    const v=Number(rawMean);
+    if (!Number.isFinite(v) || v < -100 || v > 70) continue;
+    const rawMax=maxVals[i], rawMin=minVals[i];
+    const max=(rawMax===null||rawMax===undefined||rawMax==='') ? null : Number(rawMax);
+    const min=(rawMin===null||rawMin===undefined||rawMin==='') ? null : Number(rawMin);
+    const key=dateStr.replaceAll('-','');
+    rows.push({ key, year:Number(key.slice(0,4)), md:key.slice(4), mean:v, max:Number.isFinite(max)?max:null, min:Number.isFinite(min)?min:null });
+  }
+  if (!rows.length) throw new Error('ERA5 cross-check returned no valid temperature values for this point.');
+  const latest=rows[rows.length-1];
+  const baselineVals=rows.filter(r=>r.year>=1991 && r.year<=2020 && r.md===latest.md).map(r=>r.mean);
+  const baseline=mean(baselineVals);
+  const anomaly=Number.isFinite(baseline) ? latest.mean-baseline : null;
+  const sameDay=rows.filter(r=>r.md===latest.md).sort((a,b)=>b.mean-a.mean);
+  const rank=sameDay.findIndex(r=>r.key===latest.key)+1;
+  const annualMap=new Map();
+  for (const r of rows) {
+    if (!annualMap.has(r.year)) annualMap.set(r.year, []);
+    annualMap.get(r.year).push(r.mean);
+  }
+  const currentYear=new Date().getUTCFullYear();
+  const annual=[...annualMap.entries()].map(([year,vals])=>({year, mean:mean(vals), n:vals.length})).filter(d=>d.n>=350 && d.year<currentYear).sort((a,b)=>a.year-b.year);
+  const firstTen=annual.slice(0,10);
+  const lastTen=annual.slice(-10);
+  const earlyMean=mean(firstTen.map(d=>d.mean));
+  const recentMean=mean(lastTen.map(d=>d.mean));
+  const decadalChange=(Number.isFinite(earlyMean)&&Number.isFinite(recentMean)) ? recentMean-earlyMean : null;
+  const slope=regression(annual);
+  const recent=rows.slice(-20).map(r=>{
+    const b=mean(rows.filter(x=>x.year>=1991 && x.year<=2020 && x.md===r.md).map(x=>x.mean));
+    return {...r, baseline:b, anomaly:Number.isFinite(b)?r.mean-b:null};
+  });
+  return {
+    provider:'Open-Meteo Historical Weather',
+    model: json?.generationtime_ms != null ? (json?.hourly_units ? 'Best match' : 'ERA5-Seamless') : 'ERA5-Seamless',
+    requestedLat, requestedLon,
+    dataLon:Number(json?.longitude), dataLat:Number(json?.latitude), elevation:Number(json?.elevation),
+    latest, baseline, baselineN:baselineVals.length, anomaly,
+    rank, rankN:sameDay.length,
+    annual, slope,
+    decadalChange,
+    earlyRange:firstTen.length ? `${firstTen[0].year}–${firstTen[firstTen.length-1].year}` : '—',
+    recentRange:lastTen.length ? `${lastTen[0].year}–${lastTen[lastTen.length-1].year}` : '—',
+    recordStart:rows[0].key,
+    recordEnd:latest.key,
+    max:Number.isFinite(latest.max) ? latest.max : null,
+    min:Number.isFinite(latest.min) ? latest.min : null,
+    recent,
+    fetchedAt:new Date().toISOString(),
+  };
+}
+async function fetchOpenMeteoTemperature(lat,lon,serial) {
+  const cached=readOmCache(lat,lon);
+  if (cached) return cached;
+  const today=new Date();
+  const safeEnd=new Date(today.getTime()-6*86400000); // ERA5 is normally about 5 days behind; avoid unavailable tail dates.
+  const end=`${safeEnd.getUTCFullYear()}-${String(safeEnd.getUTCMonth()+1).padStart(2,'0')}-${String(safeEnd.getUTCDate()).padStart(2,'0')}`;
+  const url=new URL('https://archive-api.open-meteo.com/v1/archive');
+  url.searchParams.set('latitude', String(lat));
+  url.searchParams.set('longitude', String(lon));
+  url.searchParams.set('start_date', '1940-01-01');
+  url.searchParams.set('end_date', end);
+  url.searchParams.set('daily', 'temperature_2m_mean,temperature_2m_max,temperature_2m_min');
+  url.searchParams.set('timezone', 'UTC');
+  url.searchParams.set('models', 'era5');
+  const response=await fetch(url.toString(), { headers:{'Accept':'application/json'} });
+  if (!response.ok) throw new Error(`ERA5 cross-check request failed (${response.status}).`);
+  const json=await response.json();
+  if (serial !== requestSerial) throw new Error('superseded');
+  const summary=summarizeOpenMeteo(json,lat,lon);
+  writeOmCache(lat,lon,summary);
+  return summary;
+}
+function daysBehind(key) {
+  const t = new Date(`${key.slice(0,4)}-${key.slice(4,6)}-${key.slice(6,8)}T12:00:00Z`).getTime();
+  return Math.max(0,Math.round((Date.now()-t)/86400000));
+}
+function compareTemperatureSources(nasa, era5) {
+  if (!nasa && !era5) return { agreementLabel:'No sources available', agreementDiff:null, displayPeriod:'—', chartSource:null, common:null };
+  if (nasa && era5) {
+    const nmap=new Map((nasa.recent||[]).map(r=>[r.key,r]));
+    const commonRows=(era5.recent||[]).filter(r=>nmap.has(r.key)).sort((a,b)=>a.key.localeCompare(b.key));
+    const e=commonRows.length ? commonRows[commonRows.length-1] : null;
+    const n=e ? nmap.get(e.key) : null;
+    if (n && e) {
+      const latestDiff=Math.abs(n.mean-e.mean);
+      const anomDiff=(Number.isFinite(n.anomaly)&&Number.isFinite(e.anomaly))?Math.abs(n.anomaly-e.anomaly):null;
+      let agreementLabel='Cross-check active';
+      if (latestDiff<=0.75 && (anomDiff==null || anomDiff<=0.75)) agreementLabel=`Strong agreement on ${isoToDisplay(e.key)} (Δ${latestDiff.toFixed(1)}°C)`;
+      else if (latestDiff<=1.5) agreementLabel=`Broad agreement on ${isoToDisplay(e.key)} (Δ${latestDiff.toFixed(1)}°C)`;
+      else agreementLabel=`Divergence to review on ${isoToDisplay(e.key)} (Δ${latestDiff.toFixed(1)}°C)`;
+      return {
+        agreementLabel, agreementDiff:latestDiff, common:{key:e.key,nasa:n,era5:e},
+        displayPeriod:`NASA ${nasa.recordStart.slice(0,4)}+ · ERA5 ${era5.recordStart.slice(0,4)}+`,
+        chartSource:era5.annual?.length ? {name:'ERA5',data:era5}:{name:'NASA POWER',data:nasa}
+      };
+    }
+    return { agreementLabel:'Both sources loaded · no common recent date', agreementDiff:null, common:null, displayPeriod:`NASA ${nasa.recordStart.slice(0,4)}+ · ERA5 ${era5.recordStart.slice(0,4)}+`, chartSource:era5.annual?.length?{name:'ERA5',data:era5}:{name:'NASA POWER',data:nasa} };
+  }
+  const only=nasa||era5;
+  return { agreementLabel:`Single source loaded (${nasa?'NASA':'ERA5'})`, agreementDiff:null, common:null, displayPeriod:`${only.recordStart.slice(0,4)}–${only.recordEnd.slice(0,4)}`, chartSource:{name:nasa?'NASA POWER':'ERA5',data:only} };
+}
+function showTemperatureBundle(bundle) {
+  setMetricLabels('heat');
+  latestTemperatureBundle=bundle;
+  const place=selectedPlace?.name || `${bundle.coords.lat.toFixed(2)}, ${bundle.coords.lon.toFixed(2)}`;
+  const nasa=bundle.nasa, era5=bundle.era5, compare=bundle.compare;
+  $("cardEyebrow").textContent='TEMPERATURE · NASA + ERA5';
+  $("cardTitle").textContent=place;
+  const nasaText=nasa ? `NASA POWER ${fmtTemp(nasa.latest.mean)} on ${isoToDisplay(nasa.latest.key)} (${daysBehind(nasa.latest.key)} day${daysBehind(nasa.latest.key)===1?'':'s'} behind)` : 'NASA POWER unavailable';
+  const eraText=era5 ? `ERA5 ${fmtTemp(era5.latest.mean)} on ${isoToDisplay(era5.latest.key)} (${daysBehind(era5.latest.key)} day${daysBehind(era5.latest.key)===1?'':'s'} behind)` : 'ERA5 unavailable';
+  $("cardSub").innerHTML=`Two independent temperature sources are now checked for this location. ${nasaText}. ${eraText}.<div class="live-pill">DUAL-SOURCE TEMPERATURE CHECK</div>`;
+  $("metricNow").textContent = nasa && era5 ? `NASA ${fmtTemp(nasa.latest.mean)} · ERA5 ${fmtTemp(era5.latest.mean)}` : (nasa ? `NASA ${fmtTemp(nasa.latest.mean)}` : era5 ? `ERA5 ${fmtTemp(era5.latest.mean)}` : 'Unavailable');
+  $("metricNormal").textContent = nasa && era5 ? `NASA ${fmtTemp(nasa.anomaly,true)} · ERA5 ${fmtTemp(era5.anomaly,true)}` : (nasa ? `NASA ${fmtTemp(nasa.anomaly,true)}` : era5 ? `ERA5 ${fmtTemp(era5.anomaly,true)}` : 'Unavailable');
+  $("metricRecord").textContent = nasa && era5 ? `NASA ${fmtTemp(nasa.decadalChange,true)} · ERA5 ${fmtTemp(era5.decadalChange,true)}` : (nasa ? `NASA ${fmtTemp(nasa.decadalChange,true)}` : era5 ? `ERA5 ${fmtTemp(era5.decadalChange,true)}` : 'Unavailable');
+  $("metricConfidence").textContent = compare.agreementLabel;
+  $("recordPeriod").textContent = `record used: ${compare.displayPeriod}`;
+  if (compare.chartSource?.data) {
+    const s=compare.chartSource.data;
+    const rankText=s.rank ? `${compare.chartSource.name}: same-date rank ${s.rank} of ${s.rankN} years (1 = warmest)` : `${compare.chartSource.name}: rank unavailable`;
+    $("trendChart").innerHTML=`<div style="width:100%"><div style="font-size:11px;color:var(--muted);margin-bottom:5px">${rankText}</div>${renderAnnualChart(s.annual, s.slope)}</div>`;
+  } else {
+    $("trendChart").innerHTML='<span>No trend chart available.</span>';
+  }
+}
+function showTemperatureError(err) {
+  setMetricLabels('heat');
+  if (String(err?.message||'').includes('superseded')) return;
+  $("eventCard").classList.remove('compact');
+  $("cardEyebrow").textContent='TEMPERATURE · DATA CONNECTION';
+  $("cardTitle").textContent=selectedPlace?.name || 'Selected location';
+  $("cardSub").textContent='The globe is working, but the temperature cross-check did not complete in this browser. Earth Evidence will not substitute invented values.';
+  $("metricNow").textContent='Unavailable';
+  $("metricNormal").textContent='Unavailable';
+  $("metricRecord").textContent='Unavailable';
+  $("metricConfidence").textContent='No claim made';
+  $("recordPeriod").textContent='record period: —';
+  $("trendChart").innerHTML=`<span>${String(err?.message||'Data request failed')}</span>`;
+}
+async function updateCard() {
+  const card=$('eventCard');
+  if (selectedPlace) card.classList.remove('compact');
+  const place=selectedPlace?.name || 'Selected location';
+  if (activeLayer==='heat' && selectedCoords) {
+    const serial=++requestSerial;
+    setLoadingCard(place);
+    try {
+      const [nasaRes, era5Res] = await Promise.allSettled([
+        fetchNasaTemperature(selectedCoords.lat,selectedCoords.lon,serial),
+        fetchOpenMeteoTemperature(selectedCoords.lat,selectedCoords.lon,serial)
+      ]);
+      if (serial!==requestSerial) return;
+      const nasa = nasaRes.status==='fulfilled' ? nasaRes.value : null;
+      const era5 = era5Res.status==='fulfilled' ? era5Res.value : null;
+      if (!nasa && !era5) throw new Error(`NASA: ${nasaRes.reason?.message || 'failed'} · ERA5: ${era5Res.reason?.message || 'failed'}`);
+      showTemperatureBundle({ coords:{...selectedCoords}, nasa, era5, compare: compareTemperatureSources(nasa, era5) });
+    } catch(err) { if (serial===requestSerial) showTemperatureError(err); }
+    return;
+  }
+  if (activeLayer==='fire') {
+    showFirePointOverview(); return;
+  }
+  setMetricLabels('heat');
+  $('cardEyebrow').textContent=`${layerLabels[activeLayer].toUpperCase()} · NOT YET CONNECTED`;
+  $('cardTitle').textContent=place;
+  $('cardSub').textContent='No measurement is shown until an approved scientific data adapter supplies the value, historical context, uncertainty and provenance.';
+  $('metricNow').textContent='Feed not connected';
+  $('metricNormal').textContent='Awaiting baseline';
+  $('metricRecord').textContent='Awaiting verified series';
+  $('metricConfidence').textContent='No claim made';
+  $('recordPeriod').textContent='record period: pending source';
+  $('trendChart').innerHTML='<span>Historical chart will appear only after a verified time series is connected.</span>';
+}
+function focusGlobeOnMobile(){
+  if(!isMobile) return;
+  window.setTimeout(()=>{
+    const shell=document.querySelector('.map-shell');
+    if(shell) shell.scrollIntoView({behavior:'smooth',block:'start'});
+    if(map){ try{map.resize();}catch(e){} }
+  },60);
+}
+function compactMapCard(eyebrow,title){
+  const card=$('eventCard');
+  card.classList.add('compact');
+  $('cardEyebrow').textContent=eyebrow;
+  $('cardTitle').textContent=title;
+}
+
+async function selectLayer(layer) {
+  activeLayer=layer;
+  document.querySelectorAll('.layer').forEach(btn=>btn.classList.toggle('active',btn.dataset.layer===layer));
+  latestTemperatureBundle=null; selectedFireEvent=null; setFireVisibility(false);
+  updateScienceOverlayVisibility();
+
+  if(layer==='heat'){
+    ensureHeatGrid();
+    // Map first on mobile: do not immediately cover the globe with the detail card.
+    if(isMobile){
+      compactMapCard('HEAT · NOAA + NASA + ERA5','Temperature anomaly map · tap the globe for local evidence');
+      focusGlobeOnMobile();
+    } else if(selectedPlace&&selectedCoords) {
+      updateCard();
+    } else {
+      compactMapCard('HEAT · NOAA + NASA + ERA5','Tap anywhere for local evidence');
+    }
+    return;
+  }
+
+  if(layer==='fire'){
+    // Pre-populate the science information, then collapse it on mobile so the satellite map stays visible.
+    scheduleFirePointRefresh();
+    showFirePointOverview();
+    if(isMobile){
+      compactMapCard('FIRE · NASA VIIRS','Clustered satellite detections · tap a circle for details');
+      focusGlobeOnMobile();
+    }
+    return;
+  }
+
+  if(selectedPlace && !isMobile) updateCard();
+  else {
+    setMetricLabels('heat');
+    compactMapCard(`${layerLabels[layer].toUpperCase()} · COMING NEXT`,'Layer not connected yet');
+    if(isMobile) focusGlobeOnMobile();
+  }
+}
+document.querySelectorAll('.layer').forEach(btn=>btn.addEventListener('click',()=>selectLayer(btn.dataset.layer)));
+
+function searchPlace() {
+  const q=$('placeSearch').value.trim().toLowerCase();
+  if (!q) return;
+  const exact=PLACES[q] || Object.entries(PLACES).find(([key,value])=>key.includes(q)||value.name.toLowerCase().includes(q))?.[1];
+  if (!exact) {
+    openDrawer('Search in V1.4','PROTOTYPE LIMIT',`<p>The search box still has a small built-in place list. Try <strong>Wales</strong>, <strong>Carmarthenshire</strong>, <strong>Spain</strong>, <strong>Antarctica</strong>, <strong>Australia</strong>, <strong>Greenland</strong> or <strong>Amazon</strong>.</p><div class="info-box">You can already tap anywhere on the globe for the NASA temperature feed. Full global place-name search is next.</div>`);
+    return;
+  }
+  selectedPlace=exact;
+  selectedCoords={lat:exact.center[1],lon:exact.center[0]};
+  if (map) map.flyTo({center:exact.center,zoom:exact.zoom,duration:1300});
+  updateCard();
+}
+$('searchBtn').addEventListener('click',searchPlace);
+$('placeSearch').addEventListener('keydown',(e)=>{if(e.key==='Enter')searchPlace();});
+
+$('trustBtn').addEventListener('click',()=>{
+  openDrawer('Trust, science & corrections','EARTH EVIDENCE',`
+    <p>Earth Evidence is designed around a simple promise: <strong>show the source, show the evidence type, show uncertainty honestly, and correct mistakes openly.</strong></p>
+    <div class="info-box"><strong>Correction log:</strong> V1.2.1 fixed missing ERA5 values being displayed as 0.0°C. V1.4 replaced the unreliable EONET marker experiment with NASA VIIRS imagery. V1.4.3 fixed a projection mismatch in that imagery. V1.5 moved the NOAA heat-grid request behind an Earth Evidence Netlify function. V1.5.1 reduced raster overplotting. V1.6 replaces the raster fire picture with clustered NASA GIBS VIIRS vector point records so users can zoom from clusters into individual detections and inspect their properties. V1.6.1 corrected the NASA GIBS geographic tile-grid maths and exposed that very coarse vector matrices could return an unrealistically sparse global view. V1.6.2 uses a denser global vector matrix, prefers a recent complete-looking satellite day rather than the first non-zero day, and adds NOAA-21 only as the user zooms in.</div>
+    <h3>Heat evidence</h3><ul><li><strong>Local daily evidence:</strong> NASA POWER + ERA5, cross-checked only on dates both share.</li><li><strong>Global colour view:</strong> NOAA NOAAGlobalTemp monthly 5° anomaly data relative to 1991–2020, fetched through an Earth Evidence server relay to reduce browser/CORS failures.</li><li><strong>Time distinction:</strong> the colour map labels its actual monthly period; the tap-card gives near-current daily evidence.</li></ul>
+    <h3>Fire evidence</h3><ul><li><strong>Map:</strong> NASA GIBS VIIRS vector point detections from NOAA-20 and NOAA-21, clustered by Earth Evidence according to zoom.</li><li><strong>Meaning:</strong> satellite-detected unusual heat / active-fire candidate — not automatically a wildfire.</li><li><strong>Point properties:</strong> where supplied, acquisition time, satellite, confidence/quality, FRP, day/night and brightness.</li><li><strong>Limitations:</strong> cloud, smoke, viewing geometry and overpass timing can hide activity.</li><li><strong>Not claimed:</strong> cause, total burned area or climate attribution from this layer alone.</li></ul>
+    <p><a class="source-link" href="https://www.ncei.noaa.gov/products/land-based-station/noaa-global-temp" target="_blank" rel="noopener">NOAA NOAAGlobalTemp ↗</a><br><a class="source-link" href="https://power.larc.nasa.gov/docs/services/api/temporal/daily/" target="_blank" rel="noopener">NASA POWER Daily API ↗</a><br><a class="source-link" href="https://open-meteo.com/en/docs/historical-weather-api" target="_blank" rel="noopener">ERA5 delivery documentation ↗</a><br><a class="source-link" href="https://firms.modaps.eosdis.nasa.gov/content/tutorials/gibs/" target="_blank" rel="noopener">NASA FIRMS / GIBS ↗</a></p>
+  `);
+});
+
+$('evidenceBtn').addEventListener('click',()=>{
+  if (activeLayer==='heat' && latestTemperatureBundle) {
+    const b=latestTemperatureBundle; const nasa=b.nasa, era5=b.era5; const compare=b.compare;
+    const nasaSlope=nasa && Number.isFinite(nasa.slope)?`${nasa.slope>=0?'+':''}${(nasa.slope*10).toFixed(2)}°C per decade`:'not available';
+    const eraSlope=era5 && Number.isFinite(era5.slope)?`${era5.slope>=0?'+':''}${(era5.slope*10).toFixed(2)}°C per decade`:'not available';
+    const nasaBlock = nasa ? `<h3>NASA POWER</h3><ul>
+        <li><strong>Requested coordinates:</strong> ${nasa.requestedLat.toFixed(3)}, ${nasa.requestedLon.toFixed(3)}</li>
+        <li><strong>Returned grid point:</strong> ${Number.isFinite(nasa.dataLat)?nasa.dataLat.toFixed(3):'—'}, ${Number.isFinite(nasa.dataLon)?nasa.dataLon.toFixed(3):'—'}</li>
+        <li><strong>Latest daily mean:</strong> ${fmtTemp(nasa.latest.mean)} on ${isoToDisplay(nasa.latest.key)}</li>
+        <li><strong>1991–2020 normal:</strong> ${fmtTemp(nasa.baseline)} (${nasa.baselineN} values used)</li>
+        <li><strong>Anomaly:</strong> ${fmtTemp(nasa.anomaly,true)}</li>
+        <li><strong>Same-date rank:</strong> ${nasa.rank} of ${nasa.rankN}, where 1 is warmest</li>
+        <li><strong>Early-vs-recent change:</strong> ${fmtTemp(nasa.decadalChange,true)} comparing ${nasa.recentRange} with ${nasa.earlyRange}</li>
+        <li><strong>Linear annual-mean trend:</strong> ${nasaSlope}</li>
+        <li><strong>Record used:</strong> ${isoToDisplay(nasa.recordStart)} to ${isoToDisplay(nasa.recordEnd)}</li>
+      </ul>` : `<h3>NASA POWER</h3><div class="info-box">NASA POWER did not return a usable result in this browser session.</div>`;
+    const eraBlock = era5 ? `<h3>ERA5</h3><ul>
+        <li><strong>Requested coordinates:</strong> ${era5.requestedLat.toFixed(3)}, ${era5.requestedLon.toFixed(3)}</li>
+        <li><strong>Returned grid point:</strong> ${Number.isFinite(era5.dataLat)?era5.dataLat.toFixed(3):'—'}, ${Number.isFinite(era5.dataLon)?era5.dataLon.toFixed(3):'—'}</li>
+        <li><strong>Latest daily mean:</strong> ${fmtTemp(era5.latest.mean)} on ${isoToDisplay(era5.latest.key)}</li>
+        <li><strong>1991–2020 normal:</strong> ${fmtTemp(era5.baseline)} (${era5.baselineN} values used)</li>
+        <li><strong>Anomaly:</strong> ${fmtTemp(era5.anomaly,true)}</li>
+        <li><strong>Same-date rank:</strong> ${era5.rank} of ${era5.rankN}, where 1 is warmest</li>
+        <li><strong>Early-vs-recent change:</strong> ${fmtTemp(era5.decadalChange,true)} comparing ${era5.recentRange} with ${era5.earlyRange}</li>
+        <li><strong>Linear annual-mean trend:</strong> ${eraSlope}</li>
+        <li><strong>Record used:</strong> ${isoToDisplay(era5.recordStart)} to ${isoToDisplay(era5.recordEnd)}</li>
+      </ul>` : `<h3>ERA5</h3><div class="info-box">ERA5 did not return a usable result in this browser session.</div>`;
+    openDrawer('Evidence for this temperature result','DUAL-SOURCE TEMPERATURE',`
+      <div class="info-box"><strong>Displayed location:</strong> ${selectedPlace?.name || 'selected point'}<br><strong>Agreement status:</strong> ${compare.agreementLabel}</div>
+      ${nasaBlock}
+      ${eraBlock}
+      <h3>Provenance</h3>
+      <ul>
+        <li><strong>Source 1 delivery service:</strong> NASA POWER Daily API.</li>
+        <li><strong>Source 2 delivery service:</strong> Open-Meteo Historical Weather API.</li>
+        <li><strong>Evidence type:</strong> gridded reanalysis / analysis, not a direct point observation.</li>
+        <li><strong>Retrieved by Earth Evidence:</strong> ${new Date().toLocaleString()}.</li>
+        <li><strong>Uncertainty:</strong> V1.4 still does not display a single per-point uncertainty number because neither path exposes a simple common uncertainty measure in this interface.</li>
+      </ul>
+      <p><a class="source-link" href="https://power.larc.nasa.gov/docs/services/api/temporal/daily/" target="_blank" rel="noopener">Open NASA POWER documentation ↗</a><br><a class="source-link" href="https://open-meteo.com/en/docs/historical-weather-api" target="_blank" rel="noopener">Open Open-Meteo historical weather documentation ↗</a></p>
+      <div class="info-box"><strong>Next verification step:</strong> move from a browser cross-check to a dedicated server-side multi-source temperature service and add official national weather service spot checks where available.</div>
+    `);
+    return;
+  }
+  if (activeLayer==='fire') {
+    openDrawer('Fire evidence','NASA GIBS · VIIRS VECTOR DATA',`<p><strong>${sourcePlans.fire}</strong></p><div class="info-box"><strong>Displayed satellite day:</strong> ${gibsFireDate||'latest available'}<br><strong>Satellites:</strong> VIIRS NOAA-20 + NOAA-21<br><strong>Current viewport:</strong> ${fireRawCount.toLocaleString()} underlying detections represented by ${firePointCount.toLocaleString()} displayed clusters/points</div><h3>What the point records can contain</h3><p>NASA's GIBS vector fire products expose detection properties such as acquisition date/time, satellite, confidence/quality fields, Fire Radiative Power (FRP), day/night and brightness values. Earth Evidence clusters them at low zoom to prevent visual alarm and overplotting.</p><div class="info-box"><strong>Not claimed:</strong> a detection is not automatically a wildfire, and Earth Evidence does not infer cause, total burned area or climate attribution from a thermal anomaly alone.</div><p><a class="source-link" href="https://firms.modaps.eosdis.nasa.gov/content/tutorials/gibs/" target="_blank" rel="noopener">NASA FIRMS / GIBS documentation ↗</a></p>`);
+    return;
+  }
+  openDrawer('Evidence for this layer',layerLabels[activeLayer].toUpperCase(),`<p><strong>${sourcePlans[activeLayer]}</strong></p><div class="info-box">No measurement is currently being claimed for ${selectedPlace?.name || 'this location'} on this layer.</div>`);
+});
+
+$('explainBtn').addEventListener('click',()=>{
+  if (activeLayer==='heat' && latestTemperatureBundle) {
+    const b=latestTemperatureBundle; const nasa=b.nasa, era5=b.era5; const compare=b.compare;
+    let p = '';
+    if (nasa) p += `NASA POWER shows <strong>${fmtTemp(nasa.latest.mean)}</strong> on <strong>${isoToDisplay(nasa.latest.key)}</strong>, which is <strong>${Math.abs(nasa.anomaly).toFixed(1)}°C ${nasa.anomaly>=0?'warmer':'cooler'}</strong> than its 1991–2020 normal. `;
+    if (era5) p += `ERA5 shows <strong>${fmtTemp(era5.latest.mean)}</strong> on <strong>${isoToDisplay(era5.latest.key)}</strong>, which is <strong>${Math.abs(era5.anomaly).toFixed(1)}°C ${era5.anomaly>=0?'warmer':'cooler'}</strong> than its 1991–2020 normal. `;
+    openDrawer('Explain it','EVIDENCE-BOUND EXPLANATION',`<p>${p}<strong>${compare.agreementLabel}.</strong></p><div class="info-box">This explanation is generated only from the values already shown in the evidence card. Earth Evidence is not using a free-running AI model to add unsupported climate claims.</div><p>For attribution questions such as “did climate change cause this particular event?”, Earth Evidence still needs a dedicated attribution evidence layer. V1.5 does not infer causation from a temperature anomaly alone.</p>`);
+    return;
+  }
+  if(activeLayer==='fire'){
+    openDrawer('Explain fire layer','NASA VIIRS THERMAL ANOMALIES',`<p>This layer shows clustered point records from NASA GIBS VIIRS thermal-anomaly products. Many detections correspond to active vegetation fires, but some can be agricultural burning, volcanoes or other unusual heat sources.</p><div class="info-box">Earth Evidence therefore calls these <strong>thermal anomalies / active-fire candidates</strong>, not automatically “wildfires”.</div><p>Cloud cover, smoke, satellite view geometry and the timing of the overpass can also cause genuine fires to be missed.</p>`);
+    return;
+  }
+  openDrawer('Explain it','AI EXPLANATION LAYER',`<p>There is no verified ${layerLabels[activeLayer].toLowerCase()} feed attached here yet, so Earth Evidence will not invent an explanation.</p>`);
+});
+
+$('actionBtn').addEventListener('click',()=>{
+  openDrawer('What can I do?','ACTION WITHOUT PARTY POLITICS',`
+    <p>Earth Evidence will turn concern into practical, evidence-linked choices without telling people which party or ideology to support.</p>
+    <h3>V1 action paths</h3>
+    <ul><li><strong>Help locally:</strong> verified environmental groups, clean-ups and restoration projects.</li><li><strong>Have your say:</strong> official consultations, reporting routes and relevant public authorities.</li><li><strong>Learn more:</strong> clear explanations and source material.</li><li><strong>Personal action:</strong> only where evidence shows the action is meaningful.</li></ul>
+    <div class="info-box"><strong>Initial pilot:</strong> Wales / UK. Community listings will require verification and freshness checks before they appear.</div>
+  `);
+});
+
+$('homeBtn').addEventListener('click',()=>{
+  requestSerial++;
+  selectedPlace=null; selectedCoords=null; latestTemperatureBundle=null; selectedFireEvent=null;
+  if (map) map.flyTo({center:isMobile?[0,12]:[-18,24],zoom:isMobile?0.65:1.55,duration:1200});
+  $('eventCard').classList.add('compact');
+  $('cardEyebrow').textContent='SELECT A LOCATION';
+  $('cardTitle').textContent='Tap anywhere on the globe';
+  $('cardSub').textContent='Heat combines NOAA global anomaly shading via an Earth Evidence server relay with NASA + ERA5 local evidence. Fire uses clustered NASA VIIRS point detections with inspectable satellite properties. Choose a layer and explore.';
+  setMetricLabels('heat'); activeLayer='heat'; setFireVisibility(false); document.querySelectorAll('.layer').forEach(btn=>btn.classList.toggle('active',btn.dataset.layer==='heat')); updateScienceOverlayVisibility(); ensureHeatGrid();
+  $('metricNow').textContent='—'; $('metricNormal').textContent='—'; $('metricRecord').textContent='—'; $('metricConfidence').textContent='—';
+  $('recordPeriod').textContent='record period: —';
+});
+
+$('eventCard').addEventListener('click',()=>{
+  const card=$('eventCard');
+  if(!card.classList.contains('compact')) return;
+  if(activeLayer==='fire'){ showFirePointOverview(); return; }
+  if(selectedPlace) card.classList.remove('compact');
+});
+
+document.querySelectorAll('.tab').forEach(tab=>tab.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t===tab));
+  const mode=tab.dataset.mode;
+  if(mode==='change') {
+    if(activeLayer==='heat'&&latestTemperatureBundle){ $('evidenceBtn').click(); }
+    else if(activeLayer==='fire') openDrawer('Fire history','NOT YET CLAIMED','<p>The current VIIRS view is a recent satellite snapshot. Earth Evidence will add historical fire comparisons only after a consistent long-term hotspot and burned-area methodology is connected.</p>');
+    else openDrawer('Change over time','HISTORICAL CONTEXT','<p>Earth Evidence compares current conditions with the scientifically defensible record available for that metric and location. The exact start date is always shown.</p>');
+  } else if(mode==='action') $('actionBtn').click();
+}));
+  </script>
+</body>
+</html>

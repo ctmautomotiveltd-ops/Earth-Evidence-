@@ -61,7 +61,10 @@ main { min-height: calc(100vh - 72px); }
 .status-strip { position:absolute; left:16px; bottom:16px; z-index:4; max-width:min(720px, calc(100% - 32px)); padding:10px 13px; border:1px solid var(--line); border-radius:12px; background:rgba(6,17,27,.84); color:var(--muted); font-size:12px; backdrop-filter:blur(12px); }
 .status-strip strong { color:var(--text); }
 .status-dot { width:8px; height:8px; display:inline-block; border-radius:50%; background:var(--warn); margin-right:7px; box-shadow:0 0 10px rgba(251,191,36,.5); }
-.event-card { position:absolute; z-index:5; top:16px; right:16px; width:min(410px, calc(100% - 32px)); background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:18px; box-shadow:var(--shadow); backdrop-filter:blur(16px); }
+.event-card { position:absolute; z-index:7; top:16px; right:16px; width:min(410px, calc(100% - 32px)); background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:18px; box-shadow:var(--shadow); backdrop-filter:blur(16px); }
+.card-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.card-back { display:none; flex-shrink:0; padding:8px; min-height:44px; border:1px solid var(--line); border-radius:10px; background:rgba(255,255,255,.04); color:var(--text); font-size:11px; }
+.legend-mobile-only { display:none; }
 .card-eyebrow, .drawer-eyebrow { color:var(--accent); font-size:11px; letter-spacing:.12em; font-weight:800; }
 .event-card h2 { margin:7px 0 6px; font-size:24px; letter-spacing:-.02em; }
 .card-sub { margin:0 0 16px; color:var(--muted); font-size:13px; line-height:1.45; }
@@ -139,7 +142,13 @@ main { min-height: calc(100vh - 72px); }
   .status-strip { display:none; }
 
   /* Start as a small bottom prompt so the globe is not hidden. */
-  .event-card { top:auto; bottom:10px; left:10px; right:10px; width:auto; max-height:70vh; overflow-y:auto; padding:16px; }
+  .event-card { top:auto; bottom:10px; left:10px; right:10px; width:auto; max-height:min(70svh,calc(100% - 64px)); overflow-y:auto; padding:16px; }
+  .card-back { display:block; }
+  .event-card.compact .card-back { display:none; }
+  .map-shell:has(.event-card:not(.compact)) .map-legend { display:none; }
+  .map-legend[data-layer="fire"] .fire-point-key,
+  .map-legend[data-layer="fire"] .legend-desktop-only { display:none; }
+  .map-legend[data-layer="fire"] .legend-mobile-only { display:inline; }
   .event-card.compact { overflow:hidden; max-height:none; padding:12px 15px; background:rgba(8,25,38,.82); }
   .event-card.compact .card-sub,
   .event-card.compact .metric-grid,
@@ -175,7 +184,7 @@ main { min-height: calc(100vh - 72px); }
       </button>
       <div class="top-actions">
         <button class="ghost" id="trustBtn">Trust & sources</button>
-        <span class="prototype-badge">V1.6.4 · DIRECT NASA FIRES</span>
+        <span class="prototype-badge">V1.6.5 · MOBILE FIRE DETAILS</span>
       </div>
     </header>
 
@@ -215,7 +224,10 @@ main { min-height: calc(100vh - 72px); }
         </div>
 
         <aside class="event-card compact" id="eventCard" aria-live="polite">
-          <div class="card-eyebrow" id="cardEyebrow">SELECT A LOCATION</div>
+          <div class="card-heading">
+            <div class="card-eyebrow" id="cardEyebrow">SELECT A LOCATION</div>
+            <button class="card-back" id="backToMapBtn" type="button">Back to map</button>
+          </div>
           <h2 id="cardTitle">Tap anywhere on the globe</h2>
           <p class="card-sub" id="cardSub">Earth Evidence will only show a measurement once its approved scientific feed, provenance and record period are available.</p>
 
@@ -425,14 +437,13 @@ function startMap() {
     map.on('zoomend',()=>{ if(activeLayer==='fire') scheduleFirePointRefresh(); });
     map.on('click', (ev) => {
       if (activeLayer === 'fire') {
-        selectedCoords = { lat: ev.lngLat.lat, lon: ev.lngLat.lng };
-        selectedPlace = {
-          name: `${Math.abs(ev.lngLat.lat).toFixed(2)}°${ev.lngLat.lat >= 0 ? 'N' : 'S'}, ${Math.abs(ev.lngLat.lng).toFixed(2)}°${ev.lngLat.lng >= 0 ? 'E' : 'W'}`,
-          center: [ev.lngLat.lng, ev.lngLat.lat],
-        };
-        const hits=map.queryRenderedFeatures(ev.point,{layers:[FIRE_POINT_LAYER_ID]});
-        if(hits && hits.length){ openFireHit(hits[0]); }
-        else showFirePointOverview();
+        const hit=findFireHit(ev.point);
+        if(hit)openFireHit(hit);
+        else {
+          fireSelectedDetails=null;selectedCoords=null;selectedPlace=null;
+          if(isMobile)compactMapCard('FIRE · NASA VIIRS','No detection selected · tap a number to zoom or a dot for details');
+          else showFirePointOverview();
+        }
         return;
       }
       selectedFireEvent = null;
@@ -461,6 +472,7 @@ function prettyMonthFromIso(s){
 }
 function setMapLegend(kind){
   const el=document.getElementById('mapLegend'); if(!el) return;
+  el.dataset.layer=kind||'';
   if(kind==='heat'){
     const state=heatGridLoaded?`${heatGridCount.toLocaleString()} NOAA grid cells loaded`:(heatGridLoading?'Loading NOAA climate grid…':(heatGridError?'Global colour grid unavailable — local point evidence still works':'Preparing NOAA climate grid…'));
     el.innerHTML=`<div class="legend-title">Temperature anomaly · ${heatMapLabel}</div><div class="legend-sub">${heatMapSource} · anomaly vs 1991–2020 · ${state}</div><div class="heat-scale"></div><div class="legend-ticks"><span>colder than average</span><span>near average</span><span>warmer than average</span></div><div class="legend-warning">Monthly climate evidence, not today's weather. Tap anywhere for near-current NASA + ERA5 daily evidence.</div>${heatGridError?'<a class="legend-link" href="https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/global/mapping" target="_blank" rel="noopener">Open NOAA official map ↗</a>':''}`;
@@ -471,7 +483,7 @@ function setMapLegend(kind){
     const state=firePointLoading?`Loading NASA records · ${fireCoverage}`:firePointError?(fireDatasetDate?'Refresh unavailable · previous snapshot retained':'NASA feed unavailable'):`${fireRawCount.toLocaleString()} detections loaded · ${fireCoverage}`;
     const coverage=fireMissingTiles?` Partial coverage: ${fireMissingTiles} tile requests failed; gaps do not mean no activity.`:'';
     const excluded=fireInvalidRecords?` ${fireInvalidRecords} invalid records excluded.`:'';
-    el.innerHTML=`<div class="legend-title">Satellite thermal anomalies · ${date}</div><div class="legend-sub">NASA GIBS VIIRS · ${state}</div><div class="fire-point-key"><span class="fire-dot-key"></span><span>Thermal anomaly / active-fire candidate</span></div><div class="legend-warning">Numbers count satellite detections, not fires. Tap a numbered cluster to zoom in. This is a daily satellite snapshot, not a live incident tracker.${coverage}${excluded}</div>`;
+    el.innerHTML=`<div class="legend-title">Satellite thermal anomalies · ${date}</div><div class="legend-sub">NASA GIBS VIIRS · ${state}</div><div class="fire-point-key"><span class="fire-dot-key"></span><span>Thermal anomaly / active-fire candidate</span></div><div class="legend-warning"><span class="legend-desktop-only">Numbers count satellite detections, not fires. Tap a numbered cluster to zoom in. This is a daily satellite snapshot, not a live incident tracker.</span><span class="legend-mobile-only">Counts are detections, not fires. Tap a number to zoom; tap a dot for details.</span>${coverage}${excluded}</div>`;
     el.classList.add('show');return;
   }
   el.classList.remove('show'); el.innerHTML='';
@@ -498,6 +510,7 @@ let fireMissingTiles=0;
 let fireInvalidRecords=0;
 let fireDataRevision=0;
 let fireLastAttemptMs=0;
+let fireSelectedDetails=null;
 const fireTileCache=new Map();
 
 function installFirePointLayer(){
@@ -625,18 +638,42 @@ async function refreshFirePoints(){
     firePointFetchedAt=new Date().toISOString();fireLoadedAtMs=Date.now();fireDatasetDate=date;gibsFireDate=date;
     fireDataRevision++;
     map.getSource(FIRE_POINT_SOURCE_ID)?.setData({type:'FeatureCollection',features:result.features});
-    if(activeLayer==='fire')showFirePointOverview();
+    if(activeLayer==='fire'&&!fireSelectedDetails){
+      const compact=$('eventCard').classList.contains('compact');
+      showFirePointOverview();
+      if(compact)compactMapCard('FIRE · NASA VIIRS','Tap a numbered circle to zoom · tap a dot for details');
+    }
   }catch(e){
     firePointError=String(e?.message||e);
     // Keep a previous valid snapshot visible and label its original date.
     console.warn('Fire point feed unavailable',e);
   }finally{firePointLoading=false;updateScienceOverlayVisibility();}
 }
+function findFireHit(point){
+  if(!map?.getLayer(FIRE_POINT_LAYER_ID))return null;
+  const options={layers:[FIRE_POINT_LAYER_ID]};
+  const exact=map.queryRenderedFeatures(point,options).filter(f=>f.geometry?.type==='Point');
+  const radius=isMobile?18:0;
+  const candidates=exact.length?exact:(radius?map.queryRenderedFeatures(
+    [[point.x-radius,point.y-radius],[point.x+radius,point.y+radius]],options
+  ).filter(f=>f.geometry?.type==='Point'):[]);
+  let closest=null,distance=Infinity;
+  for(const feature of candidates){
+    const center=feature.geometry.coordinates.slice(),current=map.getCenter().lng;
+    while(center[0]-current>180)center[0]-=360;
+    while(center[0]-current< -180)center[0]+=360;
+    const projected=map.project(center),d=Math.hypot(projected.x-point.x,projected.y-point.y);
+    if((exact.length||d<=radius)&&d<distance){closest=feature;distance=d;}
+  }
+  return closest;
+}
 async function openFireHit(feature){
   const p=feature.properties||{};
   if(p.cluster_id!==undefined&&Number(p.point_count)>1){
     const revision=fireDataRevision;
-    showFirePointDetails({...p,count:Number(p.point_count),date:gibsFireDate,frp:Number(p.frpCount)>0?p.maxFrp:null});
+    fireSelectedDetails=null;
+    if(isMobile)compactMapCard('FIRE · NASA VIIRS',`${Number(p.point_count).toLocaleString()} detections · zooming in`);
+    else showFirePointDetails({...p,count:Number(p.point_count),date:gibsFireDate,frp:Number(p.frpCount)>0?p.maxFrp:null});
     try{
       const zoom=await map.getSource(FIRE_POINT_SOURCE_ID).getClusterExpansionZoom(Number(p.cluster_id));
       if(revision!==fireDataRevision||activeLayer!=='fire')return;
@@ -644,19 +681,30 @@ async function openFireHit(feature){
       const current=map.getCenter().lng;
       while(center[0]-current>180)center[0]-=360;while(center[0]-current< -180)center[0]+=360;
       map.easeTo({center,zoom:Math.min(zoom,13),duration:650});
-    }catch(e){console.warn('Cluster expansion unavailable',e);}
-  }else showFirePointDetails(p);
+    }catch(e){
+      console.warn('Cluster expansion unavailable',e);
+      if(isMobile&&activeLayer==='fire')compactMapCard('FIRE · NASA VIIRS','Zoom with two fingers to separate these detections');
+    }
+  }else{
+    const lon=((feature.geometry.coordinates[0]+180)%360+360)%360-180,lat=feature.geometry.coordinates[1];
+    selectedCoords={lat,lon};
+    selectedPlace={name:`${Math.abs(lat).toFixed(3)}°${lat>=0?'N':'S'}, ${Math.abs(lon).toFixed(3)}°${lon>=0?'E':'W'}`,center:[lon,lat]};
+    showFirePointDetails({...p,coordinates:feature.geometry.coordinates.slice()});
+  }
 }
 function showFirePointOverview(){
-  setMetricLabels('fire');$('eventCard').classList.remove('compact');$('cardEyebrow').textContent='FIRE · NASA VIIRS POINT DATA';$('cardTitle').textContent=selectedPlace?.name||'Satellite thermal-anomaly detections';
+  fireSelectedDetails=null;
+  setMetricLabels('fire');$('eventCard').classList.remove('compact');$('eventCard').scrollTop=0;$('cardEyebrow').textContent='FIRE · NASA VIIRS POINT DATA';$('cardTitle').textContent='Satellite thermal-anomaly detections';
   $('cardSub').innerHTML=`NASA GIBS detections from NOAA-20 and NOAA-21 for <strong>${gibsFireDate||'the previous UTC day'}</strong>. Tap a numbered cluster to zoom in.<div class="live-pill">NASA GIBS · VIIRS VECTOR DATA</div>`;
   $('metricNow').textContent=gibsFireDate||'Loading satellite day';$('metricNormal').textContent=`${fireRawCount.toLocaleString()} loaded detections worldwide`;$('metricRecord').textContent='Not claimed';$('metricConfidence').textContent=fireMissingTiles?'Partial tile coverage':'Satellite thermal anomaly';
   $('recordPeriod').textContent='snapshot: one UTC satellite day';$('trendChart').textContent='Counts are detections, not numbers of fires. Repeated observations and both satellites can detect the same heat source. Cloud and satellite coverage can hide activity.';
 }
 function showFirePointDetails(p){
-  setMetricLabels('fire');$('eventCard').classList.remove('compact');const count=Number(p.point_count||p.count||1);
+  fireSelectedDetails=p;
+  setMetricLabels('fire');$('eventCard').classList.remove('compact');$('eventCard').scrollTop=0;const count=Number(p.point_count||p.count||1);
   $('cardEyebrow').textContent='FIRE · NASA VIIRS POINT DATA';$('cardTitle').textContent=count>1?`${count.toLocaleString()} clustered thermal detections`:'Satellite thermal detection';
-  $('cardSub').innerHTML=(count>1?'This cluster groups satellite detections at the current map scale. Zooming in separates its records.':'This is one satellite thermal-anomaly / active-fire candidate. It is not automatic proof of a wildfire.')+'<div class="live-pill">NASA GIBS · VIIRS VECTOR DATA</div>';
+  const location=count===1&&p.coordinates?`<strong>${Math.abs(p.coordinates[1]).toFixed(3)}°${p.coordinates[1]>=0?'N':'S'}, ${Math.abs(((p.coordinates[0]+180)%360+360)%360-180).toFixed(3)}°${(((p.coordinates[0]+180)%360+360)%360-180)>=0?'E':'W'}</strong><br>`:'';
+  $('cardSub').innerHTML=location+(count>1?'This cluster groups satellite detections at the current map scale. Zooming in separates its records.':'This is one satellite thermal-anomaly / active-fire candidate. It is not automatic proof of a wildfire.')+'<div class="live-pill">NASA GIBS · VIIRS VECTOR DATA</div>';
   $('metricNow').textContent=p.date||gibsFireDate||'Date unavailable';$('metricNormal').textContent=count>1?'NOAA-20 / NOAA-21 dataset':p.satellites||'Satellite unavailable';
   const frp=fireNumber(p.frp);
   $('metricRecord').textContent=frp!==null?`${frp.toFixed(2)} MW${count>1?' · maximum in cluster':''}`:'FRP unavailable';
@@ -665,8 +713,6 @@ function showFirePointDetails(p){
   const brightness=fireNumber(p.brightness);
   $('trendChart').textContent=count>1?'Counts include separate satellites and overpasses; they do not count independent fires.':`Day/night: ${p.daynight||'unavailable'}${brightness!==null?` · I4 brightness: ${brightness.toFixed(1)} K`:''}. Cause, burned area and climate attribution are not inferred from this detection.`;
 }
-
-
 function normaliseGridLon(lon){ lon=Number(lon); while(lon>180)lon-=360; while(lon<-180)lon+=360; return lon; }
 function addHeatPoint(out,lat,lon,val){
   lat=Number(lat); lon=normaliseGridLon(lon); val=Number(val);
@@ -1281,7 +1327,7 @@ function compactMapCard(eyebrow,title){
 async function selectLayer(layer) {
   activeLayer=layer;
   document.querySelectorAll('.layer').forEach(btn=>btn.classList.toggle('active',btn.dataset.layer===layer));
-  latestTemperatureBundle=null; selectedFireEvent=null; setFireVisibility(false);
+  latestTemperatureBundle=null; selectedFireEvent=null; fireSelectedDetails=null; setFireVisibility(false);
   updateScienceOverlayVisibility();
 
   if(layer==='heat'){
@@ -1303,7 +1349,7 @@ async function selectLayer(layer) {
     scheduleFirePointRefresh();
     showFirePointOverview();
     if(isMobile){
-      compactMapCard('FIRE · NASA VIIRS','Clustered satellite detections · tap a circle for details');
+      compactMapCard('FIRE · NASA VIIRS','Tap a numbered circle to zoom · tap a dot for details');
       focusGlobeOnMobile();
     }
     return;
@@ -1337,7 +1383,7 @@ $('placeSearch').addEventListener('keydown',(e)=>{if(e.key==='Enter')searchPlace
 $('trustBtn').addEventListener('click',()=>{
   openDrawer('Trust, science & corrections','EARTH EVIDENCE',`
     <p>Earth Evidence is designed around a simple promise: <strong>show the source, show the evidence type, show uncertainty honestly, and correct mistakes openly.</strong></p>
-    <div class="info-box"><strong>Correction log:</strong> V1.2.1 fixed missing ERA5 values being displayed as 0.0°C. V1.4 replaced the unreliable EONET marker experiment with NASA VIIRS imagery. V1.4.3 fixed a projection mismatch in that imagery. V1.5 moved the NOAA heat-grid request behind an Earth Evidence Netlify function. V1.5.1 reduced raster overplotting. V1.6 replaces the raster fire picture with clustered NASA GIBS VIIRS vector point records so users can zoom from clusters into individual detections and inspect their properties. V1.6.1 corrected the NASA GIBS geographic tile-grid maths and exposed that very coarse vector matrices could return an unrealistically sparse global view. V1.6.2 uses a denser global vector matrix, prefers a recent complete-looking satellite day rather than the first non-zero day, and adds NOAA-21 only as the user zooms in. V1.6.3 restores NOAA heat shading on static hosts using a validated monthly snapshot and an embedded fallback. V1.6.4 removes the Netlify fire dependency, reads NASA GIBS point records directly, and adds browser clustering with tap-to-zoom. The V1.6.3 heat snapshot and NASA/ERA5 point checks are preserved.</div>
+    <div class="info-box"><strong>Correction log:</strong> V1.2.1 fixed missing ERA5 values being displayed as 0.0°C. V1.4 replaced the unreliable EONET marker experiment with NASA VIIRS imagery. V1.4.3 fixed a projection mismatch in that imagery. V1.5 moved the NOAA heat-grid request behind an Earth Evidence Netlify function. V1.5.1 reduced raster overplotting. V1.6 replaces the raster fire picture with clustered NASA GIBS VIIRS vector point records so users can zoom from clusters into individual detections and inspect their properties. V1.6.1 corrected the NASA GIBS geographic tile-grid maths and exposed that very coarse vector matrices could return an unrealistically sparse global view. V1.6.2 uses a denser global vector matrix, prefers a recent complete-looking satellite day rather than the first non-zero day, and adds NOAA-21 only as the user zooms in. V1.6.3 restores NOAA heat shading on static hosts using a validated monthly snapshot and an embedded fallback. V1.6.4 removes the Netlify fire dependency, reads NASA GIBS point records directly, and adds browser clustering with tap-to-zoom. The V1.6.3 heat snapshot and NASA/ERA5 point checks are preserved. V1.6.5 fixes the mobile legend overlapping evidence, keeps cluster zooms on the map, adds a Back to map button, and increases touch tolerance around individual detection dots.</div>
     <h3>Heat evidence</h3><ul><li><strong>Local daily evidence:</strong> NASA POWER + ERA5, cross-checked only on dates both share.</li><li><strong>Global colour view:</strong> NOAA NOAAGlobalTemp monthly 5° anomaly data relative to 1991–2020, served as a validated static snapshot from this site, with an embedded fallback. The label gives the observation month, not the download date; unavailable NOAA cells are left uncoloured.</li><li><strong>Time distinction:</strong> the colour map labels its actual monthly period; the tap-card gives near-current daily evidence.</li></ul>
     <h3>Fire evidence</h3><ul><li><strong>Map:</strong> NASA GIBS VIIRS vector records from NOAA-20 and NOAA-21 for the previous UTC day, fetched directly by this browser and clustered as you zoom.</li><li><strong>Coverage:</strong> the legend reports loaded tiles. Gaps and clouds can hide activity; downloaded detection counts do not count independent fires.</li><li><strong>Meaning:</strong> satellite-detected unusual heat / active-fire candidate — not automatically a wildfire.</li><li><strong>Point properties:</strong> where supplied, acquisition time, satellite, confidence/quality, FRP, day/night and brightness.</li><li><strong>Limitations:</strong> cloud, smoke, viewing geometry and overpass timing can hide activity.</li><li><strong>Not claimed:</strong> cause, total burned area or climate attribution from this layer alone.</li></ul>
     <p><a class="source-link" href="https://www.ncei.noaa.gov/products/land-based-station/noaa-global-temp" target="_blank" rel="noopener">NOAA NOAAGlobalTemp ↗</a><br><a class="source-link" href="https://power.larc.nasa.gov/docs/services/api/temporal/daily/" target="_blank" rel="noopener">NASA POWER Daily API ↗</a><br><a class="source-link" href="https://open-meteo.com/en/docs/historical-weather-api" target="_blank" rel="noopener">ERA5 delivery documentation ↗</a><br><a class="source-link" href="https://firms.modaps.eosdis.nasa.gov/content/tutorials/gibs/" target="_blank" rel="noopener">NASA FIRMS / GIBS ↗</a></p>
@@ -1422,21 +1468,26 @@ $('actionBtn').addEventListener('click',()=>{
 
 $('homeBtn').addEventListener('click',()=>{
   requestSerial++;
-  selectedPlace=null; selectedCoords=null; latestTemperatureBundle=null; selectedFireEvent=null;
+  selectedPlace=null; selectedCoords=null; latestTemperatureBundle=null; selectedFireEvent=null; fireSelectedDetails=null;
   if (map) map.flyTo({center:isMobile?[0,12]:[-18,24],zoom:isMobile?0.65:1.55,duration:1200});
   $('eventCard').classList.add('compact');
   $('cardEyebrow').textContent='SELECT A LOCATION';
   $('cardTitle').textContent='Tap anywhere on the globe';
-  $('cardSub').textContent='Heat combines NOAA global anomaly shading via an Earth Evidence server relay with NASA + ERA5 local evidence. Fire uses clustered NASA VIIRS point detections with inspectable satellite properties. Choose a layer and explore.';
+  $('cardSub').textContent='Heat combines the NOAA monthly anomaly grid with NASA + ERA5 local evidence. Fire uses clustered NASA VIIRS point detections with inspectable satellite properties. Choose a layer and explore.';
   setMetricLabels('heat'); activeLayer='heat'; setFireVisibility(false); document.querySelectorAll('.layer').forEach(btn=>btn.classList.toggle('active',btn.dataset.layer==='heat')); updateScienceOverlayVisibility(); ensureHeatGrid();
   $('metricNow').textContent='—'; $('metricNormal').textContent='—'; $('metricRecord').textContent='—'; $('metricConfidence').textContent='—';
   $('recordPeriod').textContent='record period: —';
 });
 
+$('backToMapBtn').addEventListener('click',(ev)=>{
+  ev.stopPropagation();
+  if(activeLayer==='fire')compactMapCard('FIRE · NASA VIIRS',fireSelectedDetails?'Detection selected · tap here to reopen details':'Tap a numbered circle to zoom · tap a dot for details');
+  else compactMapCard($('cardEyebrow').textContent,$('cardTitle').textContent);
+});
 $('eventCard').addEventListener('click',()=>{
   const card=$('eventCard');
   if(!card.classList.contains('compact')) return;
-  if(activeLayer==='fire'){ showFirePointOverview(); return; }
+  if(activeLayer==='fire'){ if(fireSelectedDetails)showFirePointDetails(fireSelectedDetails);else showFirePointOverview(); return; }
   if(selectedPlace) card.classList.remove('compact');
 });
 

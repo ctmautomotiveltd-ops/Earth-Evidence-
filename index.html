@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#06111b" />
-  <title>Earth Evidence — V1 Prototype</title>
+  <title>Earth Evidence — See it. Verify it. Act.</title>
   <meta name="description" content="Earth Evidence: see what is happening, see the evidence, see what you can do." />
   <link rel="preconnect" href="https://unpkg.com" />
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" />
@@ -173,6 +173,51 @@ main { min-height: calc(100vh - 72px); }
 .trend-meta { display:flex; justify-content:space-between; gap:8px; margin-top:6px; font-size:10px; color:var(--muted); }
 .source-link { color:#8adfff; text-decoration:none; } .source-link:hover { text-decoration:underline; }
 
+
+/* V1.6.6: sourced diet comparison in the existing evidence drawer. */
+.diet-explorer { min-width:0; }
+.diet-study-label { display:inline-block; color:#bfe6ff; font-size:12px; letter-spacing:.02em; }
+.drawer-body .diet-intro { margin:8px 0 18px; color:var(--text); }
+.diet-controls { display:grid; grid-template-columns:1fr; gap:14px; }
+.diet-controls label { display:grid; min-width:0; gap:6px; font-size:13px; font-weight:600; color:var(--text); }
+.diet-controls select { width:100%; min-width:0; min-height:46px; border:1px solid var(--line); border-radius:10px; padding:10px 8px; color:var(--text); background:#102b3b; font:inherit; font-size:16px; }
+.diet-controls select:focus-visible,.diet-explorer input:focus-visible,.diet-details summary:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.drawer-body .diet-group-description { font-size:12px; margin:10px 0 18px; }
+.diet-label-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:5px 12px; font-size:13px; }
+.diet-label-row output { font-variant-numeric:tabular-nums; font-weight:700; color:var(--text); }
+.diet-slider-control { margin:18px 0; }
+.diet-slider-control label { color:var(--text); font-weight:600; }
+.diet-slider-control input { display:block; width:100%; min-height:44px; margin:0; accent-color:var(--accent); }
+.diet-endpoints { color:var(--muted); font-size:12px; }
+.drawer-body .diet-assumption { margin:6px 0 0; font-size:12px; color:var(--muted); }
+.diet-result { margin:22px 0 24px; }
+.diet-result strong { display:block; font-size:clamp(22px,5vw,30px); line-height:1.2; color:var(--text); letter-spacing:-.025em; font-variant-numeric:tabular-nums; }
+.diet-result span { display:block; margin-top:7px; color:var(--muted); font-size:13px; }
+.diet-chart { margin:0; }
+.diet-chart figcaption { color:var(--text); font-size:14px; font-weight:700; }
+.diet-chart figcaption span { display:block; color:var(--muted); font-size:12px; font-weight:400; margin-top:3px; }
+.diet-bar-row { margin-top:17px; }
+.diet-track { height:34px; background:rgba(255,255,255,.055); margin-top:7px; overflow:hidden; }
+.diet-bar { height:100%; width:0; transition:width .2s ease; }
+.diet-bar-baseline { background:#6aa6bf; }
+.diet-bar-scenario { background:var(--accent); }
+.drawer-body .diet-model-note { font-size:12px; margin:18px 0 20px; }
+.diet-details { border-top:1px solid var(--line); }
+.diet-details summary { min-height:48px; padding:13px 0; color:var(--text); cursor:pointer; font-size:13px; font-weight:600; }
+.diet-details p { font-size:12px; }
+.diet-source-table { width:100%; table-layout:fixed; border-collapse:collapse; font-size:12px; }
+.diet-source-table caption { text-align:left; font-size:12px; color:var(--muted); padding:0 0 8px; }
+.diet-source-table th,.diet-source-table td { text-align:left; padding:9px 4px; border-bottom:1px solid var(--line); overflow-wrap:anywhere; vertical-align:top; font-variant-numeric:tabular-nums; }
+.diet-source-table th:first-child { width:34%; }
+.diet-source-table th:nth-child(2) { width:24%; }
+.diet-source-table th:nth-child(3) { width:42%; }
+@media(max-width:480px){
+  .drawer[data-view="diet"] { width:100%; height:100dvh; }
+  .drawer[data-view="diet"] .drawer-head,.drawer[data-view="diet"] .drawer-body { padding:16px; }
+  .drawer[data-view="diet"] .drawer-head h2 { font-size:22px; }
+  .drawer[data-view="diet"] .close { width:44px; height:44px; flex:0 0 44px; }
+}
+@media(prefers-reduced-motion:reduce){ .diet-bar { transition:none; } }
   </style>
 </head>
 <body>
@@ -184,7 +229,7 @@ main { min-height: calc(100vh - 72px); }
       </button>
       <div class="top-actions">
         <button class="ghost" id="trustBtn">Trust & sources</button>
-        <span class="prototype-badge">V1.6.5 · MOBILE FIRE DETAILS</span>
+        <span class="prototype-badge">V1.6.6 · FOOD & LAND</span>
       </div>
     </header>
 
@@ -200,6 +245,7 @@ main { min-height: calc(100vh - 72px); }
           <button class="tab active" data-mode="now">Now</button>
           <button class="tab" data-mode="change">Change over time</button>
           <button class="tab" data-mode="action">Take action</button>
+          <button class="tab" data-mode="food" id="dietExplorerBtn" aria-haspopup="dialog" aria-controls="drawer">Food &amp; land</button>
         </div>
       </section>
 
@@ -254,7 +300,7 @@ main { min-height: calc(100vh - 72px); }
       </section>
     </main>
 
-    <section class="drawer" id="drawer" aria-hidden="true">
+    <section class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle" aria-hidden="true" inert>
       <div class="drawer-head">
         <div>
           <div class="drawer-eyebrow" id="drawerEyebrow">EARTH EVIDENCE</div>
@@ -938,22 +984,40 @@ function showFireEvent(ev){
 const $ = (id) => document.getElementById(id);
 const drawer = $('drawer');
 const scrim = $('scrim');
+let drawerOpener=null;
 
 function openDrawer(title, eyebrow, html) {
+  drawerOpener=document.activeElement;
+  delete drawer.dataset.view;
+  drawer.inert=false;
   $('drawerTitle').textContent = title;
   $('drawerEyebrow').textContent = eyebrow;
   $('drawerBody').innerHTML = html;
   drawer.classList.add('open');
   drawer.setAttribute('aria-hidden', 'false');
   scrim.classList.add('show');
+  drawer.scrollTop=0;
+  $('drawerClose').focus({preventScroll:true});
 }
 function closeDrawer() {
   drawer.classList.remove('open');
   drawer.setAttribute('aria-hidden', 'true');
   scrim.classList.remove('show');
+  drawer.inert=true;
+  if(drawer.dataset.view==='diet')document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.mode==='now'));
+  if(drawerOpener?.isConnected)drawerOpener.focus({preventScroll:true});
 }
 $('drawerClose').addEventListener('click', closeDrawer);
 scrim.addEventListener('click', closeDrawer);
+document.addEventListener('keydown',(ev)=>{
+  if(!drawer.classList.contains('open'))return;
+  if(ev.key==='Escape'){ev.preventDefault();closeDrawer();return;}
+  if(ev.key!=='Tab')return;
+  const controls=Array.from(drawer.querySelectorAll('button, [href], input, select, textarea, summary, [tabindex]')).filter(el=>!el.disabled&&el.tabIndex>=0&&el.getClientRects().length);
+  const first=controls[0],last=controls[controls.length-1];
+  if(ev.shiftKey&&document.activeElement===first){ev.preventDefault();last?.focus();}
+  else if(!ev.shiftKey&&document.activeElement===last){ev.preventDefault();first?.focus();}
+});
 
 function isoToDisplay(key) {
   if (!key || key.length !== 8) return key || '—';
@@ -1383,7 +1447,7 @@ $('placeSearch').addEventListener('keydown',(e)=>{if(e.key==='Enter')searchPlace
 $('trustBtn').addEventListener('click',()=>{
   openDrawer('Trust, science & corrections','EARTH EVIDENCE',`
     <p>Earth Evidence is designed around a simple promise: <strong>show the source, show the evidence type, show uncertainty honestly, and correct mistakes openly.</strong></p>
-    <div class="info-box"><strong>Correction log:</strong> V1.2.1 fixed missing ERA5 values being displayed as 0.0°C. V1.4 replaced the unreliable EONET marker experiment with NASA VIIRS imagery. V1.4.3 fixed a projection mismatch in that imagery. V1.5 moved the NOAA heat-grid request behind an Earth Evidence Netlify function. V1.5.1 reduced raster overplotting. V1.6 replaces the raster fire picture with clustered NASA GIBS VIIRS vector point records so users can zoom from clusters into individual detections and inspect their properties. V1.6.1 corrected the NASA GIBS geographic tile-grid maths and exposed that very coarse vector matrices could return an unrealistically sparse global view. V1.6.2 uses a denser global vector matrix, prefers a recent complete-looking satellite day rather than the first non-zero day, and adds NOAA-21 only as the user zooms in. V1.6.3 restores NOAA heat shading on static hosts using a validated monthly snapshot and an embedded fallback. V1.6.4 removes the Netlify fire dependency, reads NASA GIBS point records directly, and adds browser clustering with tap-to-zoom. The V1.6.3 heat snapshot and NASA/ERA5 point checks are preserved. V1.6.5 fixes the mobile legend overlapping evidence, keeps cluster zooms on the map, adds a Back to map button, and increases touch tolerance around individual detection dots.</div>
+    <div class="info-box"><strong>Correction log:</strong> V1.2.1 fixed missing ERA5 values being displayed as 0.0°C. V1.4 replaced the unreliable EONET marker experiment with NASA VIIRS imagery. V1.4.3 fixed a projection mismatch in that imagery. V1.5 moved the NOAA heat-grid request behind an Earth Evidence Netlify function. V1.5.1 reduced raster overplotting. V1.6 replaces the raster fire picture with clustered NASA GIBS VIIRS vector point records so users can zoom from clusters into individual detections and inspect their properties. V1.6.1 corrected the NASA GIBS geographic tile-grid maths and exposed that very coarse vector matrices could return an unrealistically sparse global view. V1.6.2 uses a denser global vector matrix, prefers a recent complete-looking satellite day rather than the first non-zero day, and adds NOAA-21 only as the user zooms in. V1.6.3 restores NOAA heat shading on static hosts using a validated monthly snapshot and an embedded fallback. V1.6.4 removes the Netlify fire dependency, reads NASA GIBS point records directly, and adds browser clustering with tap-to-zoom. The V1.6.3 heat snapshot and NASA/ERA5 point checks are preserved. V1.6.5 fixes the mobile legend overlapping evidence, keeps cluster zooms on the map, adds a Back to map button, and increases touch tolerance around individual detection dots. V1.6.6 adds a Food &amp; land explorer using six published UK diet groups and an explicitly illustrative population-switching calculation. Diet-group uncertainty and source dates are shown.</div>
     <h3>Heat evidence</h3><ul><li><strong>Local daily evidence:</strong> NASA POWER + ERA5, cross-checked only on dates both share.</li><li><strong>Global colour view:</strong> NOAA NOAAGlobalTemp monthly 5° anomaly data relative to 1991–2020, served as a validated static snapshot from this site, with an embedded fallback. The label gives the observation month, not the download date; unavailable NOAA cells are left uncoloured.</li><li><strong>Time distinction:</strong> the colour map labels its actual monthly period; the tap-card gives near-current daily evidence.</li></ul>
     <h3>Fire evidence</h3><ul><li><strong>Map:</strong> NASA GIBS VIIRS vector records from NOAA-20 and NOAA-21 for the previous UTC day, fetched directly by this browser and clustered as you zoom.</li><li><strong>Coverage:</strong> the legend reports loaded tiles. Gaps and clouds can hide activity; downloaded detection counts do not count independent fires.</li><li><strong>Meaning:</strong> satellite-detected unusual heat / active-fire candidate — not automatically a wildfire.</li><li><strong>Point properties:</strong> where supplied, acquisition time, satellite, confidence/quality, FRP, day/night and brightness.</li><li><strong>Limitations:</strong> cloud, smoke, viewing geometry and overpass timing can hide activity.</li><li><strong>Not claimed:</strong> cause, total burned area or climate attribution from this layer alone.</li></ul>
     <p><a class="source-link" href="https://www.ncei.noaa.gov/products/land-based-station/noaa-global-temp" target="_blank" rel="noopener">NOAA NOAAGlobalTemp ↗</a><br><a class="source-link" href="https://power.larc.nasa.gov/docs/services/api/temporal/daily/" target="_blank" rel="noopener">NASA POWER Daily API ↗</a><br><a class="source-link" href="https://open-meteo.com/en/docs/historical-weather-api" target="_blank" rel="noopener">ERA5 delivery documentation ↗</a><br><a class="source-link" href="https://firms.modaps.eosdis.nasa.gov/content/tutorials/gibs/" target="_blank" rel="noopener">NASA FIRMS / GIBS ↗</a></p>
@@ -1498,8 +1562,110 @@ document.querySelectorAll('.tab').forEach(tab=>tab.addEventListener('click',()=>
     if(activeLayer==='heat'&&latestTemperatureBundle){ $('evidenceBtn').click(); }
     else if(activeLayer==='fire') openDrawer('Fire history','NOT YET CLAIMED','<p>The current VIIRS view is a recent satellite snapshot. Earth Evidence will add historical fire comparisons only after a consistent long-term hotspot and burned-area methodology is connected.</p>');
     else openDrawer('Change over time','HISTORICAL CONTEXT','<p>Earth Evidence compares current conditions with the scientifically defensible record available for that metric and location. The exact start date is always shown.</p>');
-  } else if(mode==='action') $('actionBtn').click();
+  } else if(mode==='food') openDietExplorer();
+  else if(mode==='action') $('actionBtn').click();
 }));
+  </script>
+  <script id="ee-diet-explorer">
+// Published UK diet footprints, not a live global land-allocation dataset.
+// Scarborough et al. (2023), Nature Food, Table 4. DOI: 10.1038/s43016-023-00795-w.
+// Medians and 95% uncertainty intervals; diets standardized to 2,000 kcal/day, age and gender.
+const DIET_LAND_DATA=Object.freeze([
+  {id:'high',label:'Higher meat',detail:'100 g or more meat/day',land:16.78,low:10.31,high:60.84},
+  {id:'medium',label:'Medium meat',detail:'50 to under 100 g meat/day',land:11.28,low:7.38,high:26.32},
+  {id:'low',label:'Lower meat',detail:'Under 50 g meat/day',land:8.31,low:5.91,high:12.95},
+  {id:'fish',label:'Pescatarian',detail:'Fish, no meat',land:6.31,low:5.20,high:9.68},
+  {id:'vegetarian',label:'Vegetarian',detail:'No meat or fish; may include dairy and eggs',land:6.01,low:5.04,high:9.32},
+  {id:'vegan',label:'Vegan',detail:'No animal products',land:4.37,low:3.59,high:5.90}
+].map(Object.freeze));
+let dietExplorerState={baseline:'medium',target:'vegan',share:50};
+const dietAreaFormat=new Intl.NumberFormat('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});
+const dietPercentFormat=new Intl.NumberFormat('en-GB',{maximumFractionDigits:1});
+
+function calculateDietScenario(baselineId,targetId,share){
+  const baseline=DIET_LAND_DATA.find(d=>d.id===baselineId),target=DIET_LAND_DATA.find(d=>d.id===targetId);
+  if(!baseline||!target)throw new RangeError('Unknown diet group');
+  if(typeof share!=='number'||!Number.isFinite(share)||share<0||share>100)throw new RangeError('Adoption must be between 0 and 100');
+  // Source medians have two decimal places. Blend their integer hundredths
+  // before dividing, so displayed half-cent values round consistently.
+  const average=(Math.round(baseline.land*100)*(100-share)+Math.round(target.land*100)*share)/10000;
+  const changePercent=(average/baseline.land-1)*100;
+  return {baseline,target,share,average,changePercent};
+}
+function dietOptions(selected){
+  return DIET_LAND_DATA.map(d=>`<option value="${d.id}"${d.id===selected?' selected':''}>${d.label}${['high','medium','low'].includes(d.id)?' · '+d.detail:''}</option>`).join('');
+}
+function openDietExplorer(){
+  openDrawer('Diet choices & land use','FOOD & LAND',`
+    <div class="diet-explorer" id="dietExplorer">
+      <div class="diet-study-label">UK diet study · published 2023</div>
+      <p class="diet-intro">Explore what happens to land-use demand when a share of a population switches diets.</p>
+      <div class="diet-controls">
+        <label for="dietBaseline">Starting diet<select id="dietBaseline">${dietOptions(dietExplorerState.baseline)}</select></label>
+        <label for="dietTarget">Switch to<select id="dietTarget">${dietOptions(dietExplorerState.target)}</select></label>
+      </div>
+      <p class="diet-group-description" id="dietGroupDescription"></p>
+      <div class="diet-slider-control">
+        <div class="diet-label-row"><label for="dietShare">Population switching</label><output id="dietShareValue" for="dietShare">${dietExplorerState.share}%</output></div>
+        <input id="dietShare" type="range" min="0" max="100" step="1" value="${dietExplorerState.share}" aria-describedby="dietPopulationAssumption">
+        <div class="diet-label-row diet-endpoints"><span>0%</span><span>100%</span></div>
+        <p id="dietPopulationAssumption" class="diet-assumption">Starting assumption: everyone follows the selected starting diet.</p>
+      </div>
+      <div class="diet-result" role="status" aria-live="polite" aria-atomic="true">
+        <strong id="dietChangeValue"></strong><span id="dietChangeContext"></span>
+      </div>
+      <figure class="diet-chart" aria-labelledby="dietChartTitle">
+        <figcaption id="dietChartTitle">Land-use footprint <span>m² per person per day · diets adjusted to 2,000 kcal/day</span></figcaption>
+        <div class="diet-bar-row">
+          <div class="diet-label-row"><span>Starting population</span><output id="dietBaselineValue"></output></div>
+          <div class="diet-track" id="dietBaselineBar" role="img"><div class="diet-bar diet-bar-baseline" id="dietBaselineFill"></div></div>
+        </div>
+        <div class="diet-bar-row">
+          <div class="diet-label-row"><span>After dietary change</span><output id="dietScenarioValue"></output></div>
+          <div class="diet-track" id="dietScenarioBar" role="img"><div class="diet-bar diet-bar-scenario" id="dietScenarioFill"></div></div>
+        </div>
+      </figure>
+      <p class="diet-model-note"><strong>Illustrative scenario.</strong> The slider blends the study’s diet-group medians. Actual population changes depend on who switches, what they eat and how food is produced.</p>
+      <details class="diet-details">
+        <summary>Study figures & uncertainty</summary>
+        <p>Land-use footprints include cropland and pasture. Values below are medians with 95% uncertainty intervals from the study.</p>
+        <table class="diet-source-table"><caption>Land-use footprint · m² per person per day</caption><thead><tr><th scope="col">Diet</th><th scope="col">Median</th><th scope="col">95% interval</th></tr></thead><tbody>${DIET_LAND_DATA.map(d=>`<tr><th scope="row">${d.label}</th><td>${dietAreaFormat.format(d.land)}</td><td>${dietAreaFormat.format(d.low)}–${dietAreaFormat.format(d.high)}</td></tr>`).join('')}</tbody></table>
+        <p>The slider has no calculated uncertainty interval. Combining the groups’ interval limits would not give a valid population interval.</p>
+      </details>
+      <details class="diet-details">
+        <summary>Evidence, assumptions & limits</summary>
+        <p><strong>Source:</strong> Scarborough et al., <em>Nature Food</em> (2023), Table 4. The study linked diets of 55,504 UK adults with food-production impact estimates. Diet reports were collected in 1993–1999; these are historical study estimates.</p>
+        <p>Diets were standardized to 2,000 kcal/day and by age and gender. Meat categories count meat including poultry and exclude fish. Pescatarians eat fish and no meat; vegetarians eat no meat or fish and may eat dairy and eggs; vegans eat no animal products.</p>
+        <p><strong>Calculation:</strong> remaining share × starting group median + switching share × target group median. This describes a hypothetical population, rather than the current diet mix of a country.</p>
+        <p>The results compare land demand. They do not identify individual fields that would change use or establish how quickly farming would respond. Lower demand can create opportunities for nature restoration, depending on land management.</p>
+        <p>Land is one environmental measure. Fishing pressure, marine habitats, water impacts, nutrition and livelihoods need separate evidence.</p>
+        <p><a class="source-link" href="https://doi.org/10.1038/s43016-023-00795-w" target="_blank" rel="noopener">Read the study ↗</a><br><a class="source-link" href="https://www.leap.ox.ac.uk/article/vegans-vegetarians-fish-eaters-and-meat-eaters-in-the-uk-show-discrepant-environmental-impac" target="_blank" rel="noopener">Oxford’s study explanation ↗</a></p>
+      </details>
+    </div>`);
+  drawer.dataset.view='diet';
+  $('dietBaseline').addEventListener('change',()=>{dietExplorerState.baseline=$('dietBaseline').value;updateDietExplorer();});
+  $('dietTarget').addEventListener('change',()=>{dietExplorerState.target=$('dietTarget').value;updateDietExplorer();});
+  $('dietShare').addEventListener('input',()=>{dietExplorerState.share=Number($('dietShare').value);updateDietExplorer();});
+  updateDietExplorer();
+}
+function updateDietExplorer(){
+  const result=calculateDietScenario(dietExplorerState.baseline,dietExplorerState.target,dietExplorerState.share);
+  const {baseline,target,share,average,changePercent}=result;
+  const maximum=Math.max(...DIET_LAND_DATA.map(d=>d.land));
+  const unchanged=Math.abs(changePercent)<1e-9;
+  $('dietShareValue').textContent=`${share}%`;
+  $('dietShare').setAttribute('aria-valuetext',`${share} percent switching from ${baseline.label} to ${target.label}`);
+  $('dietGroupDescription').textContent=`${baseline.label}: ${baseline.detail}. ${target.label}: ${target.detail}.`;
+  $('dietChangeValue').textContent=unchanged?'No land-use change':`${dietPercentFormat.format(Math.abs(changePercent))}% ${changePercent>0?'higher':'lower'} land-use footprint`;
+  $('dietChangeContext').textContent=`${share}% switch from ${baseline.label.toLowerCase()} to ${target.label.toLowerCase()}`;
+  $('dietBaselineValue').textContent=`${dietAreaFormat.format(baseline.land)} m²`;
+  $('dietScenarioValue').textContent=`${dietAreaFormat.format(average)} m²`;
+  $('dietBaselineFill').style.width=`${baseline.land/maximum*100}%`;
+  $('dietScenarioFill').style.width=`${average/maximum*100}%`;
+  $('dietBaselineBar').setAttribute('aria-label',`Starting population: ${dietAreaFormat.format(baseline.land)} square metres per person per day`);
+  $('dietScenarioBar').setAttribute('aria-label',`Illustrative population after ${share} percent switch: ${dietAreaFormat.format(average)} square metres per person per day`);
+}
+
   </script>
 </body>
 </html>
